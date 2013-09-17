@@ -7,7 +7,11 @@ from . import Interface
 from .. import CacheError
 
 class RedisInterface(Interface):
+    """
+    Redis cache interface
 
+    link -- https://github.com/andymccurdy/redis-py
+    """
     def _dispatch(self, func, *args, **kwargs):
         try:
             return func(*args, **kwargs)
