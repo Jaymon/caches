@@ -15,12 +15,13 @@ class RedisInterface(Interface):
             raise CacheError(e)
 
     def _get_connection(self, host, port, db, **options):
-        redis_kwargs = {
+        redis_kwargs = dict(options)
+        redis_kwargs.setdefault('socket_timeout', float(options.get('socket_timeout', 1.0)))
+        redis_kwargs.update({
             'host': host,
             'db': db,
-            'socket_timeout': float(options.get('timeout', 1.0)),
-            'port': port if port else 6379
-        }
+            'port': int(port or 6379)
+        })
         return redis.StrictRedis(**redis_kwargs)
 
     def _set(self, key, value, ttl):

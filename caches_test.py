@@ -1,7 +1,17 @@
 from unittest import TestCase
+import logging
+import sys
 
 import caches
 from caches import Cache
+
+# configure root logger
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+log_handler = logging.StreamHandler(stream=sys.stderr)
+log_formatter = logging.Formatter('[%(levelname)s] %(message)s')
+log_handler.setFormatter(log_formatter)
+logger.addHandler(log_handler)
 
 class CacheTest(TestCase):
 
@@ -13,6 +23,20 @@ class CacheTest(TestCase):
         for interface_name, i in caches.interfaces.iteritems():
             i.flush()
             pass
+
+    def test_configure(self):
+        with self.assertRaises(KeyError):
+            i = caches.get_interface('connection_name')
+
+        dsn = 'caches.interface.redis.RedisInterface://host:1234/dbname#connection_name'
+        caches.configure(dsn)
+        i = caches.get_interface('connection_name')
+        self.assertTrue(i)
+
+    def test_create(self):
+        c = Cache.create('foo4', 'bar4', val='boom4545')
+        self.assertEqual(u'|1|foo4|bar4', c.key)
+        self.assertEqual(u'boom4545', c.val)
 
     def test_add_key(self):
         c = Cache()

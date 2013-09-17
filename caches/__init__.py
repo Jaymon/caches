@@ -4,11 +4,14 @@ import os
 import json
 import types
 import itertools
+import logging
 
 # 3rd party
 import dsnparse
 
 __version__ = '0.1.1'
+
+logger = logging.getLogger(__name__)
 
 interfaces = {}
 """holds all the configured interfaces"""
@@ -62,6 +65,7 @@ def set_interface(interface, name=''):
     assert interface, 'interface is empty'
 
     global interfaces
+    logger.debug('connection_name: {} -> {}'.format(name, interface.__class__.__name__))
     interfaces[name] = interface
 
 def get_interface(name=''):
@@ -89,9 +93,6 @@ class Cache(object):
 
     version = 1
     """the key version"""
-
-    val = None
-    """the value to cache"""
 
     # TODO -- implement this
     raise_errors = False
@@ -124,6 +125,10 @@ class Cache(object):
             self.add_keys(*args, **kwargs)
 
         self.interface = get_interface(self.connection_name)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
 
     def is_multi(self):
         return len(self.keys) > 1
