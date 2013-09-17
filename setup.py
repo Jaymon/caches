@@ -28,7 +28,7 @@ setup(
     url='http://github.com/firstopinion/{}'.format(name),
     packages=[name, '{}.interface'.format(name)],
     license="MIT",
-    install_requires=['dsnparse']
+    install_requires=['dsnparse'],
     classifiers=[ # https://pypi.python.org/pypi?:action=list_classifiers
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
