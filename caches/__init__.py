@@ -6,10 +6,17 @@ import types
 import itertools
 import logging
 
+from redis_collections import Dict, Set, RedisCollection
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle as pickle
+
 # 3rd party
 import dsnparse
 
-__version__ = '0.1.2'
+__version__ = '0.2'
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +88,8 @@ def get_interface(name=''):
 class CacheError(Exception): pass
 
 class Cache(object):
-
-    json = True
-    """true to make it json"""
+    serialize = True
+    """true to make it pickle values"""
 
     prefix = ''
     """set the key prefix"""
@@ -91,121 +97,127 @@ class Cache(object):
     ttl = 7200
     """how long to cache the result, 0 for unlimited"""
 
-    version = 1
-    """the key version"""
-
-    # TODO -- implement this
-    raise_errors = False
-    """true if this class wants to raise errors instead of suprressing them"""
-
     connection_name = ''
     """the interface you want to use"""
 
     interface = None
     """the interface to use for this cache class"""
 
-    @property
-    def key(self):
-        return self.keys[0] if len(self.keys) else None
-
-    @property
-    def val(self):
-        return self.vals[0] if len(self.vals) else None
-
-    @val.setter
-    def val(self, v):
-        self.vals[0] = v
+    key_args = None
 
     def __init__(self, *args, **kwargs):
-        self.keys = []
-        self.vals = []
-        if 'val' in kwargs:
-            self.add_key(*args, **kwargs)
-        else:
-            self.add_keys(*args, **kwargs)
-
-        self.interface = get_interface(self.connection_name)
+        self.key_args = args
+        #self.val = kwargs.get('val', None)
+        #self.redis = get_interface(self.connection_name)
+        super(Cache, self).__init__(data=kwargs.get('data', None))
 
     @classmethod
     def create(cls, *args, **kwargs):
         return cls(*args, **kwargs)
 
-    def is_multi(self):
-        return len(self.keys) > 1
+    def has(self):
+        """return True if the key exists in Redis"""
+        return bool(self.redis.exists(self.key))
 
-    def add_key(self, *args, **kwargs):
-        self.keys.append(u'|'.join(map(unicode, [self.prefix, self.version] + list(args))))
-        self.vals.append(kwargs.get('val', None))
+    def _create_key(self):
+        return u'.'.join(map(unicode, [self.prefix] + list(self.key_args)))
 
-    def add_keys(self, *args, **kwargs):
-        list_size = -1
-        arg_info = []
-        for i, x in enumerate(args):
-            arg_info.append([False, x])
-            if not isinstance(x, types.StringTypes) and hasattr(x, '__iter__'):
-                arg_info[i][0] = True
-                arg_info[i][1] = list(x)
-                arg_list_size = len(arg_info[i][1])
-                if list_size >= 0:
-                    assert arg_list_size == list_size, "cannot have 2 list key args of different sizes"
+    def _pickle(self, val):
+        if not self.serialize: return val
+        return pickle.dumps(val, pickle.HIGHEST_PROTOCOL)
 
-                else:
-                    list_size = arg_list_size
+    def _unpickle(self, val):
+        if val is None: return None
+        if not isinstance(val, types.StringType):
+            raise TypeError('Only strings can be unpickled (%r given).' % val)
+        if not self.serialize: return val
+        return pickle.loads(val)
 
-            else:
-                arg_info[i][1] = x
+    def _create_redis(self):
+        return get_interface(self.connection_name)
 
-        list_size = 1 if list_size < 0 else list_size
-        def make_list(arg_info, list_size):
-            if arg_info[0]:
-                return arg_info[1]
-            else:
-                return itertools.repeat(arg_info[1], list_size)
+    def _update(self, data, pipe=None):
+        p = pipe
+        exe = False
+        if pipe is None and self.ttl:
+            p = self.redis.pipeline()
+            exe = True
 
-        vals = kwargs.get('vals', [])
-        for i, arg in enumerate(itertools.izip_longest(*(make_list(x, list_size) for x in arg_info))):
-            self.add_key(*arg, val=vals[i] if len(vals) > i else None)
+        super(Cache, self)._update(data, pipe=p)
 
-    def get(self, default_val=None):
-        vals = []
-        is_multi = self.is_multi()
-        if is_multi:
-            vals = self.interface.multiget(self.keys, default_val)
+        if p:
+            if self.ttl:
+                p.expire(self.key, self.ttl)
+            if exe:
+                p.execute()
+
+
+class DictCache(Cache, Dict):
+    def __setitem__(self, key, value):
+        """Set ``d[key]`` to *value*."""
+        value = self._pickle(value)
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                pipe.hset(self.key, key, value)
+                pipe.expire(self.key, self.ttl)
+                pipe.execute()
+
         else:
-            vals = [self.interface.get(self.key, default_val)]
+            self.redis.hset(self.key, key, value)
 
-        if self.json:
-            for i, val in enumerate(vals):
-                if val != default_val:
-                    vals[i] = json.loads(val)
 
-        self.vals = vals
-        return self.vals if is_multi else self.vals[0]
+class SetCache(Cache, Set):
+    def add(self, elem):
+        ret = False
+        elem = self._pickle(elem)
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                pipe.sadd(self.key, elem)
+                pipe.expire(self.key, self.ttl)
+                ret = bool(pipe.execute()[0])
 
-    def increment(self, val=None):
-        assert len(self.keys) == 1, "increment does not work with multi cache queries"
-        if val is None:
-            val = self.val
-            if val is None:
-                val = 1
-
-        return self.interface.increment(self.key, val, self.ttl)
-
-    def set(self):
-        is_multi = self.is_multi()
-
-        vals = ((json.dumps(val) if self.json else val) for val in self.vals)
-        if is_multi:
-            self.interface.multiset(self.keys, vals, itertools.repeat(self.ttl, len(self.keys)))
         else:
-            val = list(vals)[0]
-            self.interface.set(self.key, val, self.ttl)
+            ret = bool(self.redis.sadd(self.key, elem))
 
-    def delete(self):
-        is_multi = self.is_multi()
-        if is_multi:
-            self.interface.multidelete(self.keys)
+        return ret
+
+
+class KeyCache(Cache, RedisCollection):
+
+    @property
+    def data(self):
+        if not hasattr(self, '_d'):
+            self._d = self._data()
+
+        return self._d
+
+    @data.setter
+    def data(self, data):
+        self._update(data)
+
+    @data.deleter
+    def data(self):
+        self.clear()
+        delattr(self, '_d')
+
+    def _data(self, pipe=None):
+        self._d = self._unpickle(self.redis.get(self.key))
+        return self._d
+
+    def _update(self, data, pipe=None):
+        assert not isinstance(data, RedisCollection), \
+            "Not atomic. Use '_data()' within a transaction first."
+
+        redis = pipe if pipe is not None else self.redis
+        self._d = data
+        data = self._pickle(data)
+
+        if self.ttl:
+            res = redis.setex(self.key, self.ttl, data)
+
         else:
-            self.interface.delete(self.key)
+            res = redis.set(key, data)
+
 
 configure_environ()
+
