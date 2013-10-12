@@ -8,6 +8,8 @@ import logging
 
 from redis_collections import Dict, Set, RedisCollection
 
+from .collections import CountingSet
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -16,7 +18,7 @@ except ImportError:
 # 3rd party
 import dsnparse
 
-__version__ = '0.2'
+__version__ = '0.2.1'
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,22 @@ class Cache(object):
                 p.expire(self.key, self.ttl)
             if exe:
                 p.execute()
+
+
+class PriorityQueueCache(Cache, CountingSet):
+    def add(self, elem, rank=1):
+        ret = False
+        e = self._pickle(elem)
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                pipe.zincrby(self.key, e, rank)
+                pipe.expire(self.key, self.ttl)
+                ret = pipe.execute()[0]
+
+        else:
+            ret = self.redis.zincrby(self.key, e, rank)
+
+        return ret
 
 
 class DictCache(Cache, Dict):

@@ -2,6 +2,7 @@ from unittest import TestCase
 import logging
 import sys
 import time
+import random
 
 # configure root logger before importing caches to make sure all logs print
 logger = logging.getLogger()
@@ -14,7 +15,8 @@ logger.addHandler(log_handler)
 import caches
 #from caches import Cache
 
-from caches import DictCache, SetCache, KeyCache
+from caches import DictCache, SetCache, KeyCache, PriorityQueueCache
+from caches.collections import CountingSet
 
 def setUpModule():
     """
@@ -23,6 +25,72 @@ def setUpModule():
     for interface_name, i in caches.interfaces.iteritems():
         i.flush()
         pass
+
+class CountingSetTest(TestCase):
+
+    def get_set(self, *args, **kwargs):
+        r = caches.get_interface()
+        kwargs['redis'] = r
+        s = CountingSet(*args, **kwargs)
+        return s
+
+    def test_counting_set(self):
+        data = range(1, 1002)
+        s = self.get_set(data=data)
+        count = 0
+        for elem, rank in s:
+            self.assertEqual(1, rank)
+            count += 1
+
+        self.assertEqual(count, len(data))
+
+        s = self.get_set()
+        self.assertEqual(0, len(s))
+        s.add("foo")
+        self.assertEqual(1, len(s))
+        self.assertEqual(("foo", 1), s.pop())
+        self.assertEqual(0, len(s))
+
+        s = self.get_set()
+        ints = range(1, 5)
+        for x in xrange(10):
+            i = random.choice(ints)
+            s.add(i)
+
+        count = len(s)
+        highrank = 10
+        for elem, rank in s:
+            self.assertLessEqual(rank, highrank)
+            highrank = rank
+            count -= 1
+        self.assertEqual(0, count)
+
+        count = len(s)
+        lowrank = 0
+        for elem, rank in reversed(s):
+            self.assertGreaterEqual(rank, lowrank)
+            lowrank = rank
+            count -= 1
+        self.assertEqual(0, count)
+
+
+class PriorityQueueCacheTest(TestCase):
+    def test_queue(self):
+        c = PriorityQueueCache('sfoo__init__', 'bar__init__')
+        c.ttl = 1
+        c.add('happy')
+        self.assertTrue('happy' in c)
+        time.sleep(1)
+        self.assertFalse('happy' in c)
+
+        c = PriorityQueueCache('sfoo__init__', 'bar__init__', data=set([1, 2]))
+        self.assertTrue(1 in c)
+        self.assertTrue(2 in c)
+
+        c.add(3, 5)
+        self.assertTrue(3 in c)
+        self.assertEqual((3, 5), c.pop())
+        self.assertEqual(2, len(c))
 
 
 class KeyCacheTest(TestCase):

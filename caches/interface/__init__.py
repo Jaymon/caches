@@ -17,10 +17,12 @@ class Redis(redis.StrictRedis):
             self.log('Connected using config {}', connection_config)
 
         except redis.RedisError as e:
-            pout.h()
             raise CacheError(e)
 
     def __getattribute__(self, name):
+        """
+        http://stackoverflow.com/questions/6602256/python-wrap-all-functions-in-a-library
+        """
         try:
             ret = super(Redis, self).__getattribute__(name)
 
@@ -29,8 +31,9 @@ class Redis(redis.StrictRedis):
 
         return ret
 
-#    def execute_command(self, *args, **options):
-#        super(Reids, self).execute_command
+#    def execute_command(self, *args, **kwargs):
+#        self.log(args[0])
+#        return super(Redis, self).execute_command(*args, **kwargs)
 
     def assure(self):
         self.connect()
