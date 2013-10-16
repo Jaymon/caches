@@ -17,10 +17,14 @@ class SortedSet(RedisCollection, collections.MutableSet):
         addnx -- addition to native api, will only add the elem if it doesn't already exist
 
         currently there is no union or intersect support
+    
+    http://docs.python.org/2/library/stdtypes.html#set
     """
     def __init__(self, *args, **kwargs):
         super(SortedSet, self).__init__(*args, **kwargs)
 
+        # https://github.com/antirez/redis/issues/1128
+        # https://github.com/antirez/redis/pull/1132
         lua = """
         local ret_value = 0
         if not redis.call('ZSCORE', KEYS[1], ARGV[2]) then
