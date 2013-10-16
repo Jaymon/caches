@@ -26,7 +26,7 @@ setup(
     author='Jay Marcyes',
     author_email='jay@marcyes.com',
     url='http://github.com/firstopinion/{}'.format(name),
-    packages=[name, '{}.interface'.format(name)],
+    packages=[name],
     license="MIT",
     install_requires=['dsnparse', 'redis', 'redis-collections'],
     classifiers=[ # https://pypi.python.org/pypi?:action=list_classifiers
