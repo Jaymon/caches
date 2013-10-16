@@ -6,9 +6,9 @@ import types
 import itertools
 import logging
 
-from redis_collections import Dict, Set, RedisCollection
+from redis_collections import Dict, Set, RedisCollection, Counter
 
-from .collections import CountingSet
+from .collections import SortedSet
 
 try:
     import cPickle as pickle
@@ -18,7 +18,7 @@ except ImportError:
 # 3rd party
 import dsnparse
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 logger = logging.getLogger(__name__)
 
@@ -154,20 +154,32 @@ class Cache(object):
                 p.execute()
 
 
-class PriorityQueueCache(Cache, CountingSet):
-    def add(self, elem, rank=1):
+class SortedSetCache(Cache, SortedSet):
+    def add(self, elem, score=1):
         ret = False
-        e = self._pickle(elem)
         if self.ttl:
             with self.redis.pipeline() as pipe:
-                pipe.zincrby(self.key, e, rank)
+                self._add(elem, pipe=pipe, score=score)
                 pipe.expire(self.key, self.ttl)
                 ret = pipe.execute()[0]
 
         else:
-            ret = self.redis.zincrby(self.key, e, rank)
+            ret = super(SortedSetCache, self).add(elem, score)
 
-        return ret
+        return bool(ret)
+
+    def addnx(self, elem, score=1):
+        ret = False
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                self._addnx(elem, pipe=pipe, score=score)
+                pipe.expire(self.key, self.ttl)
+                ret = pipe.execute()[0]
+
+        else:
+            ret = super(SortedSetCache, self).addnx(elem, score)
+
+        return bool(ret)
 
 
 class DictCache(Cache, Dict):
@@ -235,6 +247,62 @@ class KeyCache(Cache, RedisCollection):
 
         else:
             res = redis.set(key, data)
+
+    def increment(self, delta):
+        if self.serialize:
+            raise ValueError("Cannot increment a serialized value")
+
+        res = 0
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                pipe.incr(self.key, delta)
+                pipe.expire(self.key, self.ttl)
+                res = pipe.execute()[0]
+
+        else:
+            res = self.redis.incr(self.key, delta)
+
+        self._d = int(res)
+        return res
+
+    def __iadd__(self, other):
+        self._d = self.increment(other)
+        return self
+
+    def __isub__(self, other):
+        self._d = self.increment(-other)
+        return self
+
+    def __int__(self):
+        return int(self.data)
+
+    def __long__(self):
+        return long(self.data)
+
+    def __float__(self):
+        return float(self.data)
+
+    def __str__(self):
+        return str(self.data)
+
+    def __unicode__(self):
+        return unicode(self.data)
+
+class CounterCache(Cache, Counter):
+    """
+    http://docs.python.org/2/library/collections.html#collections.Counter
+    """
+    def __setitem__(self, key, value):
+        """Set ``d[key]`` to *value*."""
+        value = self._pickle(value)
+        if self.ttl:
+            with self.redis.pipeline() as pipe:
+                pipe.hset(self.key, key, value)
+                pipe.expire(self.key, self.ttl)
+                pipe.execute()
+
+        else:
+            self.redis.hset(self.key, key, value)
 
 
 configure_environ()

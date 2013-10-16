@@ -5,14 +5,30 @@ from itertools import imap
 from redis_collections import RedisCollection
 
 
-class CountingSet(RedisCollection, collections.MutableSet):
+class SortedSet(RedisCollection, collections.MutableSet):
     """
-    Implements a counting set (which counts duplicates of the same elem in the set)
-    using a Redis sorted set, unlike Redis, this will return items from highest to
-    lowest by default, and by lowest to highest using reversed(self)
+    Sorted set uses a similar api to Python's built in set but offers the ability
+    to add a rank to each element in order to sort the set
+
+    incompatibilities with Python set --
+        add() -- takes a score value
+        pop() -- retuns a tuple (elem, score) while a normal set would just return elem
+        __iter__ -- returns tuples like pop()
+        addnx -- addition to native api, will only add the elem if it doesn't already exist
+
+        currently there is no union or intersect support
     """
     def __init__(self, *args, **kwargs):
-        super(CountingSet, self).__init__(*args, **kwargs)
+        super(SortedSet, self).__init__(*args, **kwargs)
+
+        lua = """
+        local ret_value = 0
+        if not redis.call('ZSCORE', KEYS[1], ARGV[2]) then
+          redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+          ret_value = 1
+        end
+        return ret_value"""
+        self.lua_addnx = self.redis.register_script(lua)
 
     def __len__(self):
         return int(self.redis.zcard(self.key))
@@ -22,9 +38,6 @@ class CountingSet(RedisCollection, collections.MutableSet):
         rank = self.redis.zrank(self.key, self._pickle(elem))
         return False if rank is None else True
 
-    def add(self, elem, rank=1):
-        return self.redis.zincrby(self.key, self._pickle(elem), rank)
-
     def remove(self, elem):
         removed_count = self.redis.zrem(self.key, self._pickle(elem))
         if not removed_count:
@@ -33,23 +46,7 @@ class CountingSet(RedisCollection, collections.MutableSet):
     def discard(self, elem):
         return self.redis.zrem(self.key, self._pickle(elem))
 
-    def pop(self, last=True):
-        ret = None
-        with self.redis.pipeline() as pipe:
-            if last:
-                pipe.zrange(self.key, 0, 1, desc=last, withscores=True, score_cast_func=int)
-                pipe.zremrangebyrank(self.key, -1, -1)
-
-            else:
-                pipe.zrange(self.key, 0, 1, desc=False, withscores=True, score_cast_func=int)
-                pipe.zremrangebyrank(self.key, 0, 0)
-
-            ret = pipe.execute()[0]
-            if ret: ret = ret[0]
-
-        return (self._unpickle(ret[0]), ret[1]) if ret else (None, 0)
-
-    def _data(self, pipe=None, last=True):
+    def _data(self, pipe=None, last=False):
         redis = pipe if pipe is not None else self.redis
         limit = 500
         offset = 0
@@ -74,29 +71,93 @@ class CountingSet(RedisCollection, collections.MutableSet):
                 break
 
     def __iter__(self):
-        return self._data()
-
-    def __reversed__(self):
         return self._data(last=False)
 
+    def __reversed__(self):
+        return self._data(last=True)
+
     def _update(self, data, pipe=None):
-        super(CountingSet, self)._update(data, pipe)
+        super(SortedSet, self)._update(data, pipe)
         p = pipe if pipe is not None else self.redis.pipeline()
 
         for elem in data:
-            p.zincrby(self.key, self._pickle(elem), 1)
+            self._add(elem, score=1, pipe=p)
 
         #pout.v(p, exe)
         if pipe is None:
             p.execute()
 
+    def add(self, elem, score=1):
+        return bool(self._add(elem, score=score, pipe=self.redis))
+
+    def addnx(self, elem, score=1):
+        return bool(self._addnx(elem, score=score, pipe=self.redis))
+
+    def _add(self, elem, score, pipe):
+        return pipe.zadd(self.key, score, self._pickle(elem))
+
+    def _addnx(self, elem, score, pipe):
+        return self.lua_addnx(keys=[self.key], args=[score, self._pickle(elem)], client=pipe)
+
+
+    def pop(self, last=False):
+        ret = None
+        with self.redis.pipeline() as pipe:
+            pipe.zrange(self.key, 0, 1, desc=last, withscores=True, score_cast_func=int)
+            if last:
+                pipe.zremrangebyrank(self.key, -1, -1)
+
+            else:
+                pipe.zremrangebyrank(self.key, 0, 0)
+
+            ret = pipe.execute()[0]
+            if ret: ret = ret[0]
+
+        return (self._unpickle(ret[0]), ret[1]) if ret else (None, 0)
+
+    def union(*args, **kwargs):
+        raise NotImplemented()
+
+    def intersection(*args, **kwargs):
+        raise NotImplemented()
+
+    def difference(*args, **kwargs):
+        raise NotImplemented()
+
+    def symmetric_difference(*args, **kwargs):
+        raise NotImplemented()
+
+    def issubset(*args, **kwargs):
+        raise NotImplemented()
+
+    def issuperset(*args, **kwargs):
+        raise NotImplemented()
+
+
+class CountingSet(SortedSet):
+    """
+    Implements a counting set (which counts duplicates of the same elem in the set)
+    using a Redis sorted set, unlike Redis, this will return items from highest to
+    lowest by default, and by lowest to highest using reversed(self)
+    """
+    def _add(self, elem, pipe, score=1):
+        return pipe.zincrby(self.key, self._pickle(elem), score)
+
+    def __iter__(self):
+        return self._data(last=True)
+
+    def __reversed__(self):
+        return self._data(last=False)
+
+    def pop(self, last=True):
+        return super(CountingSet, self).pop(last)
 
 class PriorityQueue(RedisCollection):
     # TODO -- I think this can be a full blown implementation of a Queue and PriorityQueue
     # but I don't have time to do it right now since I'm going to instead do an ordered set.
     # Might want to look at Redis's pubsub stuff to implement this also instead of sortedset
     # if you do use this instead of pub/sub, zremrangebyrank will allow you to limit
-    # the set size
+    # the set size, likewise a List might be handy here with its LPOP and LPUSH methods
 
     def __len__(self):
         return self.qsize()
