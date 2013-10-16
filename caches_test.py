@@ -15,6 +15,7 @@ logger.addHandler(log_handler)
 import caches
 from caches import DictCache, SetCache, KeyCache, SortedSetCache, CounterCache
 from caches.collections import CountingSet, SortedSet
+from caches.decorators import cached
 
 def setUpModule():
     """
@@ -51,6 +52,13 @@ class SortedSetTest(TestCase):
         for r_elem, r_score in s:
             self.assertEqual(5, r_score)
             self.assertEqual('foo', r_elem)
+
+        s = SortedSet()
+        s.addnx('bar', 0)
+        s.addnx('bar', 1)
+        for r_elem, r_score in s:
+            self.assertEqual(0, r_score)
+            self.assertEqual('bar', r_elem)
 
 
 class CountingSetTest(TestCase):
@@ -269,4 +277,36 @@ class CachesTest(TestCase):
         caches.configure(dsn)
         i = caches.get_interface('connection_name')
         self.assertTrue(i)
+
+    def test_cached(self):
+        self.called = False
+        @cached(KeyCache, key=lambda *args, **kwargs: args)
+        def foo(*args):
+            self.called = True
+            return reduce(lambda x, y: x+y, args)
+
+        self.called = False
+        v = foo(1, 2, 3)
+        self.assertTrue(self.called)
+        self.assertEqual(6, v)
+
+        called = False
+        v = foo(1, 2, 3)
+        self.assertFalse(called)
+        self.assertEqual(6, v)
+
+        self.called = False
+        v = foo(1, 2, 3, 4)
+        self.assertTrue(self.called)
+        self.assertEqual(10, v)
+
+        self.called = False
+        v = foo(1, 2, 3, 4)
+        self.assertFalse(self.called)
+        self.assertEqual(10, v)
+
+        self.called = False
+        v = foo(1, 2, 3)
+        self.assertFalse(self.called)
+        self.assertEqual(6, v)
 

@@ -18,7 +18,7 @@ except ImportError:
 # 3rd party
 import dsnparse
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,7 @@ def get_interface(name=''):
 class CacheError(Exception): pass
 
 class Cache(object):
+    """base caching class that all other caching classes inherit from, can't use on its own"""
     serialize = True
     """true to make it pickle values"""
 
@@ -130,9 +131,9 @@ class Cache(object):
 
     def _unpickle(self, val):
         if val is None: return None
+        if not self.serialize: return val
         if not isinstance(val, types.StringType):
             raise TypeError('Only strings can be unpickled (%r given).' % val)
-        if not self.serialize: return val
         return pickle.loads(val)
 
     def _create_redis(self):
@@ -155,6 +156,10 @@ class Cache(object):
 
 
 class SortedSetCache(Cache, SortedSet):
+    """
+    A sorted set cache that uses Redis' zset behing the scene and gives a very
+    similar api similar to Python's built-in set
+    """
     def add(self, elem, score=1):
         ret = False
         if self.ttl:
@@ -183,6 +188,9 @@ class SortedSetCache(Cache, SortedSet):
 
 
 class DictCache(Cache, Dict):
+    """
+    A Python dict but in Redis
+    """
     def __setitem__(self, key, value):
         """Set ``d[key]`` to *value*."""
         value = self._pickle(value)
@@ -197,6 +205,9 @@ class DictCache(Cache, Dict):
 
 
 class SetCache(Cache, Set):
+    """
+    A Python set but in Redis
+    """
     def add(self, elem):
         ret = False
         elem = self._pickle(elem)
@@ -213,7 +224,26 @@ class SetCache(Cache, Set):
 
 
 class KeyCache(Cache, RedisCollection):
+    """
+    When you think of a traditional caching class, this is the class you most likely
+    think of, this will cache a value at a key.
 
+    example --
+        c = KeyCache('foo', 'bar')
+        c.data = "boom, this value is now cached" # cache the value
+
+        c2 = KeyCache('foo', 'bar')
+        print c2.data # "boom, this value is now cached"
+
+        c = KeyCache('foo', 'count')
+        c += 5
+        print c.data # 5
+        c+= 10
+        print c.data # 15
+
+        c2 = KeyCache('foo', 'count')
+        print c2 # 15
+    """
     @property
     def data(self):
         if not hasattr(self, '_d'):
@@ -290,6 +320,8 @@ class KeyCache(Cache, RedisCollection):
 
 class CounterCache(Cache, Counter):
     """
+    A Python collections.Counter instance, but in Redis
+
     http://docs.python.org/2/library/collections.html#collections.Counter
     """
     def __setitem__(self, key, value):

@@ -4,7 +4,7 @@ import itertools
 
 import redis
 
-from .. import CacheError
+from . import CacheError
 
 logger = logging.getLogger(__name__)
 
