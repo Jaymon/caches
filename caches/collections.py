@@ -1,3 +1,11 @@
+"""
+Just some other collections on top of what redis_collections gives us
+
+would a dequeue be handy?
+http://docs.python.org/2/library/collections.html#collections.deque
+
+http://docs.python.org/2/library/collections.html#collections-abstract-base-classes
+"""
 from __future__ import absolute_import
 import collections
 from itertools import imap
@@ -19,6 +27,9 @@ class SortedSet(RedisCollection, collections.MutableSet):
         currently there is no union or intersect support
     
     http://docs.python.org/2/library/stdtypes.html#set
+    http://code.activestate.com/recipes/576694/
+    http://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
+    http://stackoverflow.com/questions/5953205/sorted-container-in-python
     """
     def __init__(self, *args, **kwargs):
         super(SortedSet, self).__init__(*args, **kwargs)
@@ -162,6 +173,8 @@ class PriorityQueue(RedisCollection):
     # Might want to look at Redis's pubsub stuff to implement this also instead of sortedset
     # if you do use this instead of pub/sub, zremrangebyrank will allow you to limit
     # the set size, likewise a List might be handy here with its LPOP and LPUSH methods
+    # http://docs.python.org/2/library/queue.html#module-Queue
+    # http://oldblog.antirez.com/post/250
 
     def __len__(self):
         return self.qsize()

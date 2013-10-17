@@ -172,3 +172,6 @@ Some of the interface is inspired from a module that [Ryan Johnson](https://gith
 
 MIT
 
+## Other links
+
+[Dogpile](http://dogpilecache.readthedocs.org/en/latest/usage.html)

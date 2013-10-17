@@ -12,6 +12,11 @@ class FuncDecorator(object):
 
     based off of the task decorator in Fabric
     https://github.com/fabric/fabric/blob/master/fabric/decorators.py#L15
+
+    other links -- 
+    http://pythonconquerstheuniverse.wordpress.com/2012/04/29/python-decorators/
+    http://stackoverflow.com/questions/739654/
+    http://stackoverflow.com/questions/666216/decorator-classes-in-python
     """
     def __init__(self, *args, **kwargs):
 
@@ -102,7 +107,8 @@ class cached(FuncDecorator):
 
     def handle_func(self, *args, **kwargs):
         # build the caching object
-        c = self.cache_cls(*self.key(*args, **kwargs))
+        key_args = self.key(*args, **kwargs)
+        c = self.cache_cls(*key_args)
         for k, n in self.cache_options.iteritems():
             setattr(c, k, n)
 
