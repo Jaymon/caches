@@ -182,6 +182,58 @@ class KeyCacheTest(TestCase):
         #self.assertEqual('booyah', getattr(c, 'data', 'booyah'))
         self.assertEqual(None, c.data)
 
+    def test___cmp__(self):
+        c = KeyCache('KeyCache.__cmp__')
+
+        self.assertFalse(c == "b")
+        self.assertTrue(c < "c")
+        self.assertFalse(c > "a")
+
+        c.data = "b"
+        c = KeyCache('KeyCache.__cmp__')
+        self.assertTrue(c == "b")
+        self.assertTrue(c < "c")
+        self.assertTrue(c > "a")
+
+    def test___int__(self):
+        c = KeyCache('KeyCache.__int__')
+        self.assertEqual(0, int(c))
+        self.assertEqual(None, c.data)
+
+        c.data = 5
+        c = KeyCache('KeyCache.__int__')
+        self.assertEqual(5, int(c))
+
+    def test___nonzero__(self):
+        c = KeyCache('KeyCache.__nonzero__')
+        self.assertFalse(bool(c))
+
+        c.data = 500
+        c = KeyCache('KeyCache.__nonzero__')
+        self.assertTrue(bool(c))
+
+        c.data = 0
+        self.assertFalse(bool(c))
+
+    def test_normalize(self):
+
+        class TKC(KeyCache):
+            def normalize(self, val):
+                if val is None: val = 0
+                return int(val)
+
+        c = KeyCache('KeyCache.normalize')
+        self.assertFalse(isinstance(c.data, int))
+        self.assertEqual(None, c.data)
+
+        c = TKC('TKC.normalize')
+        self.assertTrue(isinstance(c.data, int))
+        self.assertEqual(0, c.data)
+
+
+
+
+
     def test_has(self):
         c = SetCache('khas')
 

@@ -18,7 +18,7 @@ except ImportError:
 # 3rd party
 import dsnparse
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 logger = logging.getLogger(__name__)
 
@@ -90,15 +90,21 @@ def get_interface(name=''):
 class CacheError(Exception): pass
 
 class Cache(object):
-    """base caching class that all other caching classes inherit from, can't use on its own"""
+    """
+    base caching class that all other caching classes inherit from, can't use on its own
+
+    This is a mizin, it can't really be called on its own and is meant to be used
+    with a child that also extends RedisCollection
+    """
+
     serialize = True
     """true to make it pickle values"""
 
     prefix = ''
     """set the key prefix"""
 
-    ttl = 7200
-    """how long to cache the result, 0 for unlimited"""
+    ttl = 0
+    """how long to cache the result in seconds, 0 for unlimited"""
 
     connection_name = ''
     """the interface you want to use"""
@@ -110,8 +116,6 @@ class Cache(object):
 
     def __init__(self, *args, **kwargs):
         self.key_args = args
-        #self.val = kwargs.get('val', None)
-        #self.redis = get_interface(self.connection_name)
         super(Cache, self).__init__(data=kwargs.get('data', None))
 
     @classmethod
@@ -122,6 +126,11 @@ class Cache(object):
         """return True if the key exists in Redis"""
         return bool(self.redis.exists(self.key))
 
+    def normalize(self, val):
+        """this can be extended in child classes to further normalize the returned value,
+        eg cast it as an int or something. This method is called from _unpickle()"""
+        return val
+
     def _create_key(self):
         return u'.'.join(map(unicode, [self.prefix] + list(self.key_args)))
 
@@ -130,11 +139,11 @@ class Cache(object):
         return pickle.dumps(val, pickle.HIGHEST_PROTOCOL)
 
     def _unpickle(self, val):
-        if val is None: return None
-        if not self.serialize: return val
-        if not isinstance(val, types.StringType):
+        if val is None: return self.normalize(None)
+        if not self.serialize: return self.normalize(val)
+        if not isinstance(val, types.StringTypes):
             raise TypeError('Only strings can be unpickled (%r given).' % val)
-        return pickle.loads(val)
+        return self.normalize(pickle.loads(val))
 
     def _create_redis(self):
         return get_interface(self.connection_name)
@@ -276,7 +285,7 @@ class KeyCache(Cache, RedisCollection):
             res = redis.setex(self.key, self.ttl, data)
 
         else:
-            res = redis.set(key, data)
+            res = redis.set(self.key, data)
 
     def increment(self, delta):
         if self.serialize:
@@ -304,19 +313,43 @@ class KeyCache(Cache, RedisCollection):
         return self
 
     def __int__(self):
-        return int(self.data)
+        v = self.data
+        if not v: v = 0
+        return int(v)
 
     def __long__(self):
-        return long(self.data)
+        v = self.data
+        if not v: v = 0
+        return long(v)
 
     def __float__(self):
-        return float(self.data)
+        v = self.data
+        if not v: v = 0.0
+        return float(v)
 
     def __str__(self):
-        return str(self.data)
+        v = self.data
+        if not v: v = ""
+        return str(v)
 
     def __unicode__(self):
-        return unicode(self.data)
+        v = self.data
+        if not v: v = u""
+        return unicode(v)
+
+    def __cmp__(self, other):
+        ret = 0
+        v = self.data
+        if v < other:
+            ret = -1
+        elif v > other:
+            ret = 1
+
+        return ret
+
+    def __nonzero__(self):
+        v = self.data
+        return bool(v)
 
 class CounterCache(Cache, Counter):
     """
