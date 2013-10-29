@@ -129,6 +129,22 @@ class SortedSetCacheTest(TestCase):
 
 
 class KeyCacheTest(TestCase):
+    def test_transaction(self):
+        ck = KeyCache('Cache', 'transaction', 'KeyCache')
+        ck.serialize = False
+
+        ck += 15
+        self.assertEqual(15, ck.data)
+
+        with ck.transaction():
+            ck.data = 5
+
+            ck += 5
+            ck += 6
+            ck += 7
+
+        self.assertEqual(23, ck.data)
+
     def test_increment(self):
         c = KeyCache('ktest_increment')
         c.serialize = False
@@ -317,6 +333,28 @@ class CounterTest(TestCase):
         self.assertTrue('happy' in c)
         time.sleep(1)
         self.assertFalse('happy' in c)
+
+
+class CacheTest(TestCase):
+    def test_transaction(self):
+        ck = KeyCache('Cache', 'transaction', 'KeyCache')
+        ck.serialize = False
+
+        cd = DictCache('Cache', 'transaction', 'DictCache')
+        with ck.transaction(cd):
+            #ck.data = 5
+            #ck.data = 6
+
+            #cd['foo'] = 1
+            cd['bar'] = 2
+
+#            c += 5
+#            c += 6
+#            c += 7
+
+        #self.assertEqual(20, c.data)
+
+
 
 
 class CachesTest(TestCase):

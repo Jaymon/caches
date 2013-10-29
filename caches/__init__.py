@@ -5,6 +5,7 @@ import json
 import types
 import itertools
 import logging
+from contextlib import contextmanager
 
 from redis_collections import Dict, Set, RedisCollection, Counter
 
@@ -109,14 +110,44 @@ class Cache(object):
     connection_name = ''
     """the interface you want to use"""
 
-    interface = None
-    """the interface to use for this cache class"""
-
     key_args = None
+
+    is_pipeline = False
 
     def __init__(self, *args, **kwargs):
         self.key_args = args
         super(Cache, self).__init__(data=kwargs.get('data', None))
+
+    def in_transaction(self):
+        #return isinstance(self.redis, RedisPipeline)
+        return self.is_pipeline
+
+    @contextmanager
+    def transaction(self, *instances):
+
+        # first thing we do, make sure all the instances have a compatible connection
+        self.is_pipeline = True
+        pipeline = self.redis.pipeline()
+        connection_name = self.connection_name
+        self.redis = pipeline
+        for i in instances:
+            assert i.connection_name == connection_name, "incompatible Redis connections for transaction"
+            i.redis = pipeline
+
+        # perform the with block of code
+        #yield self
+        yield
+
+        # execute all the commands the with block of code queued up
+        results = pipeline.execute()
+
+        # restore previous connections
+        self.redis = self._create_redis
+        for i in instances:
+            i.redis = i._create_redis()
+
+        self.is_pipeline = False
+        #return results
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -210,8 +241,7 @@ class DictCache(Cache, Dict):
                 pipe.execute()
 
         else:
-            self.redis.hset(self.key, key, value)
-
+            p = self.redis.hset(self.key, key, value)
 
 class SetCache(Cache, Set):
     """
@@ -270,6 +300,7 @@ class KeyCache(Cache, RedisCollection):
         delattr(self, '_d')
 
     def _data(self, pipe=None):
+        assert not self.in_transaction(), "getting data while in a transaction leads to unexpected results"
         self._d = self._unpickle(self.redis.get(self.key))
         return self._d
 
@@ -291,25 +322,37 @@ class KeyCache(Cache, RedisCollection):
         if self.serialize:
             raise ValueError("Cannot increment a serialized value")
 
+        def set__d(res):
+            self._d = int(res)
+
         res = 0
+        self.redis.set_callback(set__d)
+
         if self.ttl:
-            with self.redis.pipeline() as pipe:
-                pipe.incr(self.key, delta)
-                pipe.expire(self.key, self.ttl)
-                res = pipe.execute()[0]
+            if self.in_transaction():
+                self.redis.incr(self.key, delta)
+                self.redis.expire(self.key, self.ttl)
+                res = self.redis
+
+            else:
+                with self.redis.pipeline() as pipe:
+                    pipe.incr(self.key, delta)
+                    pipe.expire(self.key, self.ttl)
+                    res = int(pipe.execute()[0])
 
         else:
             res = self.redis.incr(self.key, delta)
+            if not self.in_transaction():
+                res = int(res)
 
-        self._d = int(res)
         return res
 
     def __iadd__(self, other):
-        self._d = self.increment(other)
+        self.increment(other)
         return self
 
     def __isub__(self, other):
-        self._d = self.increment(-other)
+        self.increment(-other)
         return self
 
     def __int__(self):

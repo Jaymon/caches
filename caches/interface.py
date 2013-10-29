@@ -3,12 +3,105 @@ import logging
 import itertools
 
 import redis
+from redis.client import StrictPipeline
 
 from . import CacheError
 
 logger = logging.getLogger(__name__)
 
-class Redis(redis.StrictRedis):
+class RedisMixin(object):
+
+    execute_callback = None
+
+    command_stack_callback = {}
+
+    log_key = set(['DEL', 'DUMP', 'EXISTS', 'EXPIRE', 'EXPIREAT', 'MOVE', 'PERSIST',
+                'PEXPIRE', 'PEXPIREAT', 'PTTL', 'RENAME', 'RENAMENX', 'RESTORE',
+                'SORT', 'TTL', 'TYPE', 'HGETALL', 'HKEYS', 'HLEN', 'HVALS', 'SADD',
+                'SCARD', 'SISMEMBER', 'SMEMBERS', 'SPOP', 'SRANDMEMBER', 'SREM', 'ZADD',
+                'ZCARD', 'ZCOUNT', 'ZINCRBY', 'ZRANGE', 'ZRANGEBYSCORE', 'ZRANK', 'ZREM',
+                'ZREMRANGEBYRANK', 'ZREMRANGEBYSCORE', 'ZREVRANGE', 'ZREVRANGEBYSCORE', 
+                'ZREVRANK', 'ZSCORE'
+              ])
+
+    log_key_field = set(['HDEL', 'HEXISTS', 'HGET', 'HINCRBY', 'HINCRBYFLOAT', 'HSET', 'HSETNX'])
+
+    def log(self, format_str, *format_args, **log_options):
+        """
+        wrapper around the module's logger
+
+        format_str -- string -- the message to log
+        *format_args -- list -- if format_str is a string containing {}, then format_str.format(*format_args) is ran
+        **log_options --
+            level -- something like logging.DEBUG
+        """
+        log_level = log_options.get('level', logging.DEBUG)
+        if logger.isEnabledFor(log_level):
+            if format_args:
+                logger.log(log_level, format_str.format(*format_args))
+            else:
+                logger.log(log_level, format_str)
+
+    def pipeline(self, transaction=True, shard_hint=None):
+        """
+        Return a new pipeline object that can queue multiple commands for
+        later execution. ``transaction`` indicates whether all commands
+        should be executed atomically. Apart from making a group of operations
+        atomic, pipelines are useful for reducing the back-and-forth overhead
+        between the client and server.
+        """
+        pipeline = RedisPipeline(
+            self.connection_pool,
+            self.response_callbacks,
+            transaction,
+            shard_hint
+        )
+
+        pipeline.command_stack_callback = dict(self.command_stack_callback)
+        self.command_stack_callback = {}
+        return pipeline
+
+    def set_callback(self, callback):
+        self.execute_callback = callback
+
+    def get_callback(self):
+        cb = self.execute_callback
+        self.execute_callback = None
+        return cb
+
+    def run_callbacks(self, res):
+        for i, callback in self.command_stack_callback.iteritems():
+            if callback: callback(res[i])
+
+        self.command_stack_callback = {}
+
+class RedisPipeline(RedisMixin, StrictPipeline):
+    def _execute_pipeline(self, connection, commands, raise_on_error):
+        self.log('Execute {} Pipeline commands', len(commands))
+        res = super(RedisPipeline, self)._execute_pipeline(connection, commands, raise_on_error)
+        self.run_callbacks(res)
+        return res
+
+    def _execute_transaction(self, connection, commands, raise_on_error):
+        self.log('Execute {} Transaction commands', len(commands))
+        res = super(RedisPipeline, self)._execute_transaction(connection, commands, raise_on_error)
+        self.run_callbacks(res)
+        return res
+
+    def execute_command(self, *args, **kwargs):
+        if args[0] in self.log_key:
+            self.log("{} QUEUED - {}", args[0], args[1])
+        elif args[0] in self.log_key_field:
+            self.log("{} QUEUED - {} > {}", args[0], args[1], args[2])
+
+        return super(RedisPipeline, self).execute_command(*args, **kwargs)
+
+    def pipeline_execute_command(self, *args, **options):
+        self.command_stack_callback[len(self.command_stack)] = self.get_callback()
+        return super(RedisPipeline, self).pipeline_execute_command(*args, **options)
+        return self
+
+class Redis(RedisMixin, redis.StrictRedis):
     def __init__(self, **connection_config):
         connection_config['socket_timeout'] = float(connection_config.get('socket_timeout', 1.0))
         connection_config['port'] = int(connection_config.get('port') or 6379)
@@ -31,32 +124,20 @@ class Redis(redis.StrictRedis):
 
         return ret
 
-#    def execute_command(self, *args, **kwargs):
-#        self.log(args[0])
-#        return super(Redis, self).execute_command(*args, **kwargs)
-
-    def assure(self):
-        self.connect()
-
     def flush(self):
         """this will clear the entire cache db, be careful with this"""
         self.log('FLUSH DB')
         #return self._dispatch(self._flush)
         return self.flushdb()
 
-    def log(self, format_str, *format_args, **log_options):
-        """
-        wrapper around the module's logger
+    def execute_command(self, *args, **kwargs):
+        if args[0] in self.log_key:
+            self.log("{} - {}", args[0], args[1])
+        elif args[0] in self.log_key_field:
+            pout.t()
+            self.log("{} - {} > {}", args[0], args[1], args[2])
 
-        format_str -- string -- the message to log
-        *format_args -- list -- if format_str is a string containing {}, then format_str.format(*format_args) is ran
-        **log_options --
-            level -- something like logging.DEBUG
-        """
-        log_level = log_options.get('level', logging.DEBUG)
-        if logger.isEnabledFor(log_level):
-            if format_args:
-                logger.log(log_level, format_str.format(*format_args))
-            else:
-                logger.log(log_level, format_str)
+        self.command_stack_callback[0] = self.get_callback()
+        res = super(Redis, self).execute_command(*args, **kwargs)
+        self.run_callbacks([res])
 
