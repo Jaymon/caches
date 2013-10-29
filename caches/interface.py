@@ -11,10 +11,6 @@ logger = logging.getLogger(__name__)
 
 class RedisMixin(object):
 
-    execute_callback = None
-
-    command_stack_callback = {}
-
     log_key = set(['DEL', 'DUMP', 'EXISTS', 'EXPIRE', 'EXPIREAT', 'MOVE', 'PERSIST',
                 'PEXPIRE', 'PEXPIREAT', 'PTTL', 'RENAME', 'RENAMENX', 'RESTORE',
                 'SORT', 'TTL', 'TYPE', 'HGETALL', 'HKEYS', 'HLEN', 'HVALS', 'SADD',
@@ -57,35 +53,18 @@ class RedisMixin(object):
             shard_hint
         )
 
-        pipeline.command_stack_callback = dict(self.command_stack_callback)
-        self.command_stack_callback = {}
         return pipeline
 
-    def set_callback(self, callback):
-        self.execute_callback = callback
-
-    def get_callback(self):
-        cb = self.execute_callback
-        self.execute_callback = None
-        return cb
-
-    def run_callbacks(self, res):
-        for i, callback in self.command_stack_callback.iteritems():
-            if callback: callback(res[i])
-
-        self.command_stack_callback = {}
 
 class RedisPipeline(RedisMixin, StrictPipeline):
     def _execute_pipeline(self, connection, commands, raise_on_error):
         self.log('Execute {} Pipeline commands', len(commands))
         res = super(RedisPipeline, self)._execute_pipeline(connection, commands, raise_on_error)
-        self.run_callbacks(res)
         return res
 
     def _execute_transaction(self, connection, commands, raise_on_error):
         self.log('Execute {} Transaction commands', len(commands))
         res = super(RedisPipeline, self)._execute_transaction(connection, commands, raise_on_error)
-        self.run_callbacks(res)
         return res
 
     def execute_command(self, *args, **kwargs):
@@ -96,10 +75,6 @@ class RedisPipeline(RedisMixin, StrictPipeline):
 
         return super(RedisPipeline, self).execute_command(*args, **kwargs)
 
-    def pipeline_execute_command(self, *args, **options):
-        self.command_stack_callback[len(self.command_stack)] = self.get_callback()
-        return super(RedisPipeline, self).pipeline_execute_command(*args, **options)
-        return self
 
 class Redis(RedisMixin, redis.StrictRedis):
     def __init__(self, **connection_config):
@@ -134,10 +109,8 @@ class Redis(RedisMixin, redis.StrictRedis):
         if args[0] in self.log_key:
             self.log("{} - {}", args[0], args[1])
         elif args[0] in self.log_key_field:
-            pout.t()
             self.log("{} - {} > {}", args[0], args[1], args[2])
 
-        self.command_stack_callback[0] = self.get_callback()
         res = super(Redis, self).execute_command(*args, **kwargs)
-        self.run_callbacks([res])
+        return res
 
