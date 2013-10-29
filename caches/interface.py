@@ -101,7 +101,7 @@ class Redis(RedisMixin, redis.StrictRedis):
 
     def flush(self):
         """this will clear the entire cache db, be careful with this"""
-        self.log('FLUSH DB')
+        self.log('FLUSH DB {}', self.connection_pool.connection_kwargs['db'])
         #return self._dispatch(self._flush)
         return self.flushdb()
 

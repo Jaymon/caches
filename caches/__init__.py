@@ -75,7 +75,7 @@ def set_interface(interface, name=''):
     assert interface, 'interface is empty'
 
     global interfaces
-    logger.debug('connection_name: {} -> {}'.format(name, interface.__class__.__name__))
+    logger.debug('connection_name: "{}" -> {}.{}'.format(name, interface.__module__, interface.__class__.__name__))
     interfaces[name] = interface
 
 def get_interface(name=''):
