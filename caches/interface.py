@@ -17,7 +17,10 @@ class RedisMixin(object):
                 'SCARD', 'SISMEMBER', 'SMEMBERS', 'SPOP', 'SRANDMEMBER', 'SREM', 'ZADD',
                 'ZCARD', 'ZCOUNT', 'ZINCRBY', 'ZRANGE', 'ZRANGEBYSCORE', 'ZRANK', 'ZREM',
                 'ZREMRANGEBYRANK', 'ZREMRANGEBYSCORE', 'ZREVRANGE', 'ZREVRANGEBYSCORE', 
-                'ZREVRANK', 'ZSCORE'
+                'ZREVRANK', 'ZSCORE', 'APPEND', 'BITCOUNT', 'BITOP', 'DECR', 'DECRBY', 
+                'GET', 'GETBIT', 'GETRANGE', 'GETSET', 'INCR', 'INCRBY', 'INCRBYFLOAT',
+                'MGET', 'MSET', 'MSETNX', 'PSETEX', 'SET', 'SETBIT', 'SETEX', 'SETNX',
+                'SETRANGE', 'STRLEN'
               ])
 
     log_key_field = set(['HDEL', 'HEXISTS', 'HGET', 'HINCRBY', 'HINCRBYFLOAT', 'HSET', 'HSETNX'])

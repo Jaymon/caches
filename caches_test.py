@@ -330,6 +330,26 @@ class CachesTest(TestCase):
         i = caches.get_interface('connection_name')
         self.assertTrue(i)
 
+class DecoratorsTest(TestCase):
+    def test_cached_classmethod(self):
+        class CMFoo(object):
+            pk = 5
+
+        class CachedCM(object):
+            @classmethod
+            @cached(KeyCache, key=lambda cls, foo: [foo.pk])
+            def get_average(cls, foo):
+                return 1.1
+
+        tf = CMFoo()
+        tf.pk = 100
+
+        r = CachedCM.get_average(tf)
+        self.assertEqual(1.1, r)
+
+        r = CachedCM.get_average(tf)
+        self.assertEqual(1.1, r)
+
     def test_cached(self):
         self.called = False
         @cached(KeyCache, key=lambda *args, **kwargs: args)
