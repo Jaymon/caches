@@ -7,24 +7,26 @@ import itertools
 import logging
 from contextlib import contextmanager
 
-from redis_collections import Dict, Set, RedisCollection, Counter
-
-from .collections import SortedSet
-
 try:
     import cPickle as pickle
 except ImportError:
-    import pickle as pickle
+    import pickle
 
 # 3rd party
 import dsnparse
 
-__version__ = '0.2.6'
+# first party
+from redis_collections import Dict, Set, RedisCollection, Counter
+from .collections import SortedSet
+
+
+__version__ = '0.2.7'
 
 logger = logging.getLogger(__name__)
 
 interfaces = {}
 """holds all the configured interfaces"""
+
 
 def configure_environ(dsn_env_name='CACHES_DSN'):
     if dsn_env_name in os.environ:
@@ -44,6 +46,7 @@ def configure_environ(dsn_env_name='CACHES_DSN'):
         except KeyError:
             pass
 
+
 def configure(dsn):
     """
     configure an interface to be used to query a backend
@@ -60,13 +63,21 @@ def configure(dsn):
     c = dsnparse.parse(dsn)
     assert c.fragment not in interfaces, 'a connection named "{}" has already been configured'.format(c.name)
 
+    # compensate for passing pw as username (eg, not doing //:password@ but instead //password@)
+    password = None
+    if c.password:
+        password = c.password
+    elif c.username:
+        password = c.username
+
     interface_module_name, interface_class_name = c.scheme.rsplit('.', 1)
     interface_module = importlib.import_module(interface_module_name)
     interface_class = getattr(interface_module, interface_class_name)
 
-    i = interface_class(host=c.host, port=c.port, db=c.paths[0], **c.query)
+    i = interface_class(host=c.host, port=c.port, db=c.paths[0], password=password, **c.query)
     set_interface(i, c.fragment)
     return i
+
 
 def set_interface(interface, name=''):
     """
@@ -77,6 +88,7 @@ def set_interface(interface, name=''):
     global interfaces
     logger.debug('connection_name: "{}" -> {}.{}'.format(name, interface.__module__, interface.__class__.__name__))
     interfaces[name] = interface
+
 
 def get_interface(name=''):
     """
@@ -89,6 +101,7 @@ def get_interface(name=''):
 
 
 class CacheError(Exception): pass
+
 
 class Cache(object):
     """
