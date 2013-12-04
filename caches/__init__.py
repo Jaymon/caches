@@ -20,7 +20,7 @@ from redis_collections import Dict, Set, RedisCollection, Counter
 from .collections import SortedSet
 
 
-__version__ = '0.2.7'
+__version__ = '0.2.9'
 
 logger = logging.getLogger(__name__)
 

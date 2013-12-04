@@ -130,6 +130,10 @@ class SortedSet(RedisCollection, collections.MutableSet):
 
         return (self._unpickle(ret[0]), ret[1]) if ret else (None, 0)
 
+    def rpop(self):
+        """just like pop, but pops from the end of the set instead of the front"""
+        return self.pop(last=True)
+
     def union(*args, **kwargs):
         raise NotImplemented()
 

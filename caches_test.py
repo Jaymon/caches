@@ -362,9 +362,9 @@ class DecoratorsTest(TestCase):
         self.assertTrue(self.called)
         self.assertEqual(6, v)
 
-        called = False
+        self.called = False
         v = foo(1, 2, 3)
-        self.assertFalse(called)
+        self.assertFalse(self.called)
         self.assertEqual(6, v)
 
         self.called = False
