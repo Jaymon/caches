@@ -44,6 +44,7 @@ class SortedSet(RedisCollection, collections.MutableSet):
         end
         return ret_value"""
         self.lua_addnx = self.redis.register_script(lua)
+        #pout.v(self.lua_addnx)
 
     def __len__(self):
         return int(self.redis.zcard(self.key))

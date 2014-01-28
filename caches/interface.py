@@ -3,7 +3,7 @@ import logging
 import itertools
 
 import redis
-from redis.client import StrictPipeline
+from redis.client import StrictPipeline, Script
 
 from . import CacheError
 
@@ -25,6 +25,8 @@ class RedisMixin(object):
 
     log_key_field = set(['HDEL', 'HEXISTS', 'HGET', 'HINCRBY', 'HINCRBYFLOAT', 'HSET', 'HSETNX'])
 
+    log_script = set(['EVALSHA'])
+
     def log(self, format_str, *format_args, **log_options):
         """
         wrapper around the module's logger
@@ -42,13 +44,6 @@ class RedisMixin(object):
                 logger.log(log_level, format_str)
 
     def pipeline(self, transaction=True, shard_hint=None):
-        """
-        Return a new pipeline object that can queue multiple commands for
-        later execution. ``transaction`` indicates whether all commands
-        should be executed atomically. Apart from making a group of operations
-        atomic, pipelines are useful for reducing the back-and-forth overhead
-        between the client and server.
-        """
         pipeline = RedisPipeline(
             self.connection_pool,
             self.response_callbacks,
@@ -75,6 +70,8 @@ class RedisPipeline(RedisMixin, StrictPipeline):
             self.log("{} QUEUED - {}", args[0], args[1])
         elif args[0] in self.log_key_field:
             self.log("{} QUEUED - {} > {}", args[0], args[1], args[2])
+        elif args[0] in self.log_script:
+            self.log("LUA QUEUED - {}", args[3])
 
         return super(RedisPipeline, self).execute_command(*args, **kwargs)
 
@@ -113,6 +110,8 @@ class Redis(RedisMixin, redis.StrictRedis):
             self.log("{} - {}", args[0], args[1])
         elif args[0] in self.log_key_field:
             self.log("{} - {} > {}", args[0], args[1], args[2])
+        elif args[0] in self.log_script:
+            self.log("LUA - {}", args[3])
 
         res = super(Redis, self).execute_command(*args, **kwargs)
         return res

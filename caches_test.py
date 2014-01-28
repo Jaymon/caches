@@ -35,7 +35,7 @@ class SortedSetTest(TestCase):
         return s
 
     def test_addnx(self):
-        s = SortedSet()
+        s = self.get_set()
         s.addnx('foo', 1)
         s.addnx('foo', 6)
 
