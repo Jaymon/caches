@@ -70,7 +70,11 @@ def configure(dsn):
     elif c.username:
         password = c.username
 
-    interface_module_name, interface_class_name = c.scheme.rsplit('.', 1)
+    scheme = c.scheme
+    if scheme == 'redis':
+        scheme = 'caches.interface.Redis' # Default interface for redis
+    
+    interface_module_name, interface_class_name = scheme.rsplit('.', 1)
     interface_module = importlib.import_module(interface_module_name)
     interface_class = getattr(interface_module, interface_class_name)
 
