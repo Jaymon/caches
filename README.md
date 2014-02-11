@@ -3,7 +3,7 @@
 A Python caching library that gives a similar interface to standard Python data structures
 like Dict and Set but is backed by redis.
 
-Caches was built for [First Opinion](http://firstopinion.co).
+Caches was lovingly crafted for [First Opinion](http://firstopinion.co).
 
 
 ## How to use
@@ -45,7 +45,7 @@ print c.key # foo
 print c # "boom!"
 ```
 
-Each class is meant to be extended so you can set some parameters:
+Each caches base caching class is meant to be extended so you can set some parameters:
 
 * **serialize** -- boolean -- True if you want all values pickled, False if you don't (ie, you're caching ints or strings or something).
 
@@ -58,7 +58,7 @@ Each class is meant to be extended so you can set some parameters:
 ```python
 class MyIntCache(KeyCache):
   serialize = False # don't bother to serialize values since we're storing ints
-  prefix = "MyIntCache" # every key will have this prefix, change to invalidate all current cache
+  prefix = "MyIntCache" # every key will have this prefix, change to invalidate all currently cached values
   ttl = 7200 # store each int for 2 hours
 ```
 
@@ -136,13 +136,12 @@ print c['bar'] # 10
 
 Caches exposes a decorator to make caching the return value of a function easy. This only works for `KeyCache` derived caching.
 
-The `cached` decorator can accept a caching class (defaults to `KeyCache`) and also a key function (similar to the `sorted()` key argument, except caches key argument returns a list that can be passed to the constructor of the caching class as `*args`.
+The `cached` decorator can accept a caching class and also a key function (similar to the python [built-in `sorted()` function](http://docs.python.org/2/library/functions.html#sorted) key argument), except caches key argument returns a list that can be passed to the constructor of the caching class as `*args`.
 
 ```python
 from caches import KeyCache
-from caches.decorators import cached
 
-@cached(key="some_cache_key")
+@KeyCache.cached(key="some_cache_key")
 def foo(*args):
     return reduce(lambda x, y: x+y, args)
 
@@ -150,17 +149,36 @@ foo(1, 2) # will compute the value and cache the return value
 foo(1, 2) # return value from cache
 
 foo(1, 2, 3) # uh-oh, wrong value, our key was too static
+```
 
-# let's try again, this time with a dynamic key
-@cached(key=lambda *args: args)
+Let's try again, this time with a dynamic key
+
+```python
+@KeyCache.cached(key=lambda *args: args)
 def foo(*args):
     return reduce(lambda x, y: x+y, args)
 
 foo(1, 2) # compute and cache, key func returned [1, 2]
 foo(1, 2) # grabbed from cache
 foo(1, 2, 3) # compute and cache because our key func returned [1, 2, 3]
+```
 
-# what about custom caches classes?
+What about custom caches classes?
+
+```python
+class CustomCache(KeyCache): pass
+
+@CustomCache.cached(key=lambda *args: args)
+def foo(*args):
+    return reduce(lambda x, y: x+y, args)
+```
+
+Which is the same, functionally, as:
+
+```python
+from caches import KeyCache
+from caches.decorators import cached
+
 class CustomCache(KeyCache): pass
 
 @cached(CustomCache, key=lambda *args: args)
@@ -185,6 +203,7 @@ or from source using pip:
 Caches uses the very cool [redis_collections module](https://redis-collections.readthedocs.org/en/latest/).
 
 Some of the interface is inspired from a module that [Ryan Johnson](https://github.com/bismark) wrote for Undrip.
+
 
 ## License
 

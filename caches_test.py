@@ -320,7 +320,6 @@ class CounterTest(TestCase):
 
 
 class CachesTest(TestCase):
-
     def test_configure(self):
         with self.assertRaises(KeyError):
             i = caches.get_interface('connection_name')
@@ -331,6 +330,67 @@ class CachesTest(TestCase):
         self.assertTrue(i)
 
 class DecoratorsTest(TestCase):
+    def test_keycache_decorator_classmethod(self):
+        class KCDCM(KeyCache):
+            prefix = 'kcdcm'
+
+        class CachedKCDCM(object):
+            pk = 35
+            called = 0
+            @KCDCM.cached(key=lambda self: [self.pk])
+            def foo(self):
+                self.called += 1
+                return self.pk
+
+        tf = CachedKCDCM()
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(1, tf.called)
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(1, tf.called)
+
+    def test_method(self):
+        class CachedMethod(object):
+            pk = 25
+            called = 0
+            @cached(KeyCache, key=lambda self: [self.pk])
+            def foo(self):
+                self.called += 1
+                return self.pk
+
+        tf = CachedMethod()
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(1, tf.called)
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(1, tf.called)
+
+        tf.pk += 1
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(2, tf.called)
+        self.assertEqual(tf.pk, tf.foo())
+        self.assertEqual(2, tf.called)
+
+    def test_property(self):
+        class CachedProp(object):
+            pk = 15
+            called = 0
+            @property
+            @cached(KeyCache, key=lambda self: [self.pk])
+            def foo(self):
+                self.called += 1
+                return self.pk
+
+        tf = CachedProp()
+        self.assertEqual(tf.pk, tf.foo)
+        self.assertEqual(1, tf.called)
+        self.assertEqual(tf.pk, tf.foo)
+        self.assertEqual(1, tf.called)
+
+        tf.pk += 1
+        self.assertEqual(tf.pk, tf.foo)
+        self.assertEqual(2, tf.called)
+        self.assertEqual(tf.pk, tf.foo)
+        self.assertEqual(2, tf.called)
+
     def test_cached_classmethod(self):
         class CMFoo(object):
             pk = 5

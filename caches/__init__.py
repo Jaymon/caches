@@ -18,9 +18,10 @@ import dsnparse
 # first party
 from redis_collections import Dict, Set, RedisCollection, Counter
 from .collections import SortedSet
+from . import decorators
 
 
-__version__ = '0.2.10'
+__version__ = '0.2.11'
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +279,13 @@ class KeyCache(Cache, RedisCollection):
     def data(self):
         self.clear()
         delattr(self, '_d')
+
+    @classmethod
+    def cached(cls, key=None, *args, **kwargs):
+        """very similar to the generic decorator, except this one you don't have
+        to specify the caching class, it will use the class whose method you called"""
+        dec = decorators.cached(cls, key, *args, **kwargs)
+        return dec
 
     def _data(self, pipe=None):
         self._d = self._unpickle(self.redis.get(self.key))

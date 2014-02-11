@@ -3,8 +3,6 @@ import types
 
 from decorators import FuncDecorator
 
-from . import KeyCache
-
 
 class cached(FuncDecorator):
     """
@@ -33,7 +31,7 @@ class cached(FuncDecorator):
         foo(1, 2) # grabbed from cache
         foo(1, 2, 3) # compute and cache because our key func returned [1, 2, 3]
 
-    cache_cls -- class -- The caches class you want to use (defaults to KeyCache)
+    cache_cls -- class -- The caches class you want to use
     key -- string|callback -- if a string, then always use the same key, if a callback
         then the callback should have the same signature as the wrapped function
         beacause the arguments passed to the function are passed to the key func
@@ -43,11 +41,9 @@ class cached(FuncDecorator):
         ttl -- integer -- how long to keep the cache value in the cache
         prefix -- string -- if you want the cache to have a certain prefix on the key
     """
-    def decorate(self, func, cache_cls=None, key=None, **cache_options):
-        if not cache_cls: cache_cls = KeyCache
-
+    def decorate(self, func, cache_cls, key=None, **cache_options):
         if key:
-            if isinstance(key, types.StringTypes):
+            if isinstance(key, (types.StringTypes, types.IntType, types.LongType, types.FloatType)):
                 key = lambda *args, **kwargs: [key]
 
         else:
