@@ -173,19 +173,6 @@ def foo(*args):
     return reduce(lambda x, y: x+y, args)
 ```
 
-Which is the same, functionally, as:
-
-```python
-from caches import KeyCache
-from caches.decorators import cached
-
-class CustomCache(KeyCache): pass
-
-@cached(CustomCache, key=lambda *args: args)
-def foo(*args):
-    return reduce(lambda x, y: x+y, args)
-```
-
 
 ## Install
 
