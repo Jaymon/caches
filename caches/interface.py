@@ -81,12 +81,18 @@ class RedisMixin(object):
             else:
                 if isinstance(res, types.StringTypes):
                     format_log += ' ... string'
+
                 elif isinstance(res, list):
                     format_log += ' ... list {}'
                     format_args.append(len(res))
 
+                elif isinstance(res, dict):
+                    format_log += ' ... dict {}'
+                    format_args.append(len(res))
+
                 else:
-                    pout.v(res)
+                    format_log += ' ... unknown'
+                    #pout.v(res)
 
         self.log(format_log, *format_args)
 
