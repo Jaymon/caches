@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import logging
 import itertools
+import types
 
 import redis
 from redis.client import StrictPipeline, Script
@@ -43,6 +44,52 @@ class RedisMixin(object):
             else:
                 logger.log(log_level, format_str)
 
+    def log_call(self, args, res, is_pipe=False, **log_options):
+        log_level = log_options.get('level', logging.DEBUG)
+        if not logger.isEnabledFor(log_level): return
+
+        format_log = '{} QUEUED' if is_pipe else '{}'
+        format_args = []
+
+        if args[0] in self.log_key:
+            format_log += ' - {}'
+            format_args.append(args[0])
+            format_args.append(args[1])
+
+        elif args[0] in self.log_key_field:
+            format_log += ' - {} > {}'
+            format_args.append(args[0])
+            format_args.append(args[1])
+            format_args.append(args[2])
+
+        elif args[0] in self.log_script:
+            format_log += ' - {}'
+            format_args.append('LUA')
+            format_args.append(args[3])
+
+        else:
+            format_args.append(args[0])
+
+        if not is_pipe:
+            print_res = res is None or isinstance(res, bool) or \
+                    isinstance(res, (float, int, long))
+
+            if print_res:
+                format_log += ' ... {}'
+                format_args.append(res)
+
+            else:
+                if isinstance(res, types.StringTypes):
+                    format_log += ' ... string'
+                elif isinstance(res, list):
+                    format_log += ' ... list {}'
+                    format_args.append(len(res))
+
+                else:
+                    pout.v(res)
+
+        self.log(format_log, *format_args)
+
     def pipeline(self, transaction=True, shard_hint=None):
         pipeline = RedisPipeline(
             self.connection_pool,
@@ -66,14 +113,16 @@ class RedisPipeline(RedisMixin, StrictPipeline):
         return res
 
     def execute_command(self, *args, **kwargs):
-        if args[0] in self.log_key:
-            self.log("{} QUEUED - {}", args[0], args[1])
-        elif args[0] in self.log_key_field:
-            self.log("{} QUEUED - {} > {}", args[0], args[1], args[2])
-        elif args[0] in self.log_script:
-            self.log("LUA QUEUED - {}", args[3])
+#        if args[0] in self.log_key:
+#            self.log("{} QUEUED - {}", args[0], args[1])
+#        elif args[0] in self.log_key_field:
+#            self.log("{} QUEUED - {} > {}", args[0], args[1], args[2])
+#        elif args[0] in self.log_script:
+#            self.log("LUA QUEUED - {}", args[3])
 
-        return super(RedisPipeline, self).execute_command(*args, **kwargs)
+        res = super(RedisPipeline, self).execute_command(*args, **kwargs)
+        self.log_call(args, res, is_pipe=True)
+        return res
 
 
 class Redis(RedisMixin, redis.StrictRedis):
@@ -106,13 +155,14 @@ class Redis(RedisMixin, redis.StrictRedis):
         return self.flushdb()
 
     def execute_command(self, *args, **kwargs):
-        if args[0] in self.log_key:
-            self.log("{} - {}", args[0], args[1])
-        elif args[0] in self.log_key_field:
-            self.log("{} - {} > {}", args[0], args[1], args[2])
-        elif args[0] in self.log_script:
-            self.log("LUA - {}", args[3])
+#        if args[0] in self.log_key:
+#            self.log("{} - {}", args[0], args[1])
+#        elif args[0] in self.log_key_field:
+#            self.log("{} - {} > {}", args[0], args[1], args[2])
+#        elif args[0] in self.log_script:
+#            self.log("LUA - {}", args[3])
 
         res = super(Redis, self).execute_command(*args, **kwargs)
+        self.log_call(args, res)
         return res
 

@@ -153,6 +153,9 @@ class KeyCacheTest(TestCase):
 
     def test_key(self):
         c = KeyCache('kfoo', 'bar')
+        self.assertEqual(None, c.data)
+
+        c = KeyCache('kfoo', 'bar')
         self.assertFalse(c.has())
         c.data = "foo"
         self.assertTrue(c.has())
@@ -162,7 +165,6 @@ class KeyCacheTest(TestCase):
         c = KeyCache('kfoo', 'bar')
         self.assertTrue(c.has())
         self.assertEqual("foo", c.data)
-
 
         c = KeyCache('kfoo')
         c.ttl = 1
