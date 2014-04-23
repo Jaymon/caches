@@ -21,7 +21,7 @@ from .collections import SortedSet
 from . import decorators
 
 
-__version__ = '0.2.13'
+__version__ = '0.2.14'
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,8 @@ def configure(dsn):
     global interfaces
 
     c = dsnparse.parse(dsn)
-    assert c.fragment not in interfaces, 'a connection named "{}" has already been configured'.format(c.name)
+    if c.fragment in interfaces:
+        raise ValueError('a connection named "{}" has already been configured'.format(c.fragment))
 
     # compensate for passing pw as username (eg, not doing //:password@ but instead //password@)
     password = None
@@ -75,7 +76,12 @@ def configure(dsn):
     interface_module = importlib.import_module(interface_module_name)
     interface_class = getattr(interface_module, interface_class_name)
 
-    i = interface_class(host=c.host, port=c.port, db=c.paths[0], password=password, **c.query)
+    connection_config = dict(host=c.host, port=c.port, password=password, **c.query)
+    paths = c.paths
+    if paths:
+        connection_config['db'] = paths[0]
+
+    i = interface_class(**connection_config)
     set_interface(i, c.fragment)
     return i
 
@@ -84,7 +90,8 @@ def set_interface(interface, name=''):
     """
     don't want to bother with a dsn? Use this method to make an interface available
     """
-    assert interface, 'interface is empty'
+    if not interface:
+        raise ValueError('interface is empty')
 
     global interfaces
     logger.debug('connection_name: "{}" -> {}.{}'.format(name, interface.__module__, interface.__class__.__name__))

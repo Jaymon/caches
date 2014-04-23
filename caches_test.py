@@ -331,6 +331,21 @@ class CachesTest(TestCase):
         i = caches.get_interface('connection_name')
         self.assertTrue(i)
 
+    def test_configure_heroku_dsn(self):
+        interfaces = caches.interfaces
+
+        caches.interfaces = {}
+        dsn = "caches.interface.Redis://redistogo:d381fd671fe61c0f6d36bdb4c25d3050@grideye.redistogo.com:10174/"
+        caches.configure(dsn)
+
+        i = caches.get_interface()
+        self.assertTrue(i)
+
+        i = caches.get_interface('')
+        self.assertTrue(i)
+
+        caches.interfaces = interfaces
+
 class DecoratorsTest(TestCase):
     def test_keycache_decorator_classmethod(self):
         class KCDCM(KeyCache):
