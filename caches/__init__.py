@@ -21,7 +21,7 @@ from .collections import SortedSet
 from . import decorators
 
 
-__version__ = '0.2.14'
+__version__ = '0.2.15'
 
 logger = logging.getLogger(__name__)
 
@@ -285,13 +285,15 @@ class KeyCache(Cache, RedisCollection):
     @data.deleter
     def data(self):
         self.clear()
-        delattr(self, '_d')
+        try:
+            delattr(self, '_d')
+        except AttributeError: pass
 
     @classmethod
-    def cached(cls, key=None, *args, **kwargs):
+    def cached(cls, *args, **kwargs):
         """very similar to the generic decorator, except this one you don't have
         to specify the caching class, it will use the class whose method you called"""
-        dec = decorators.cached(cls, key, *args, **kwargs)
+        dec = decorators.cached(cls, *args, **kwargs)
         return dec
 
     def _data(self, pipe=None):

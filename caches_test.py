@@ -232,12 +232,64 @@ class KeyCacheTest(TestCase):
         self.assertTrue(isinstance(c.data, int))
         self.assertEqual(0, c.data)
 
-
-
-
-
     def test_has(self):
-        c = SetCache('khas')
+        c = KeyCache('KeyCache.khas')
+        self.assertFalse(c.has())
+
+        c.data = "bah"
+        self.assertTrue(c.has())
+
+        c.clear()
+        self.assertFalse(c.has())
+
+    def test_cached(self):
+
+        self.called_count = 0
+        class TCached(KeyCache):
+            prefix = 'Keycache.cached'
+
+        @TCached.cached(key='cached')
+        def calculate(x, y):
+            self.called_count += 1
+            return x + y
+
+        self.assertEqual(0, self.called_count)
+        r = calculate(1, 2)
+        self.assertEqual(3, r)
+        self.assertEqual(1, self.called_count)
+        r = calculate(1, 2)
+        self.assertEqual(3, r)
+        self.assertEqual(1, self.called_count)
+
+        c = TCached('cached')
+        c.clear()
+
+        r = calculate(1, 2)
+        self.assertEqual(3, r)
+        self.assertEqual(2, self.called_count)
+
+        self.called_count = 0
+        @TCached.cached(key=lambda *args: args)
+        def calculate2(x, y):
+            self.called_count += 1
+            return x + y
+
+        self.assertEqual(0, self.called_count)
+        r = calculate2(1, 2)
+        self.assertEqual(3, r)
+        self.assertEqual(1, self.called_count)
+        r = calculate2(1, 2)
+        self.assertEqual(3, r)
+        self.assertEqual(1, self.called_count)
+        r = calculate2(3, 5)
+        self.assertEqual(8, r)
+        self.assertEqual(2, self.called_count)
+
+    def test___del__(self):
+        c = KeyCache('KeyCache.__del__')
+        del(c.data)
+        # if it doesn't raise an error, it worked correctly
+
 
 
 class SetCacheTest(TestCase):

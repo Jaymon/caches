@@ -34,35 +34,39 @@ class cached(FuncDecorator):
     cache_cls -- class -- The caches class you want to use
     key -- string|callback -- if a string, then always use the same key, if a callback
         then the callback should have the same signature as the wrapped function
-        beacause the arguments passed to the function are passed to the key func
+        because the arguments passed to the function are passed to the key func
         to compute the key, the callback should return a list, the list will be passed
         to cache_cls like this: cache_cls(*list_returned_from_key)
     **cache_options -- dict -- 
         ttl -- integer -- how long to keep the cache value in the cache
         prefix -- string -- if you want the cache to have a certain prefix on the key
+        canary -- mixed -- the sentinal value to check for, defaults to None
     """
     def decorate(self, func, cache_cls, key=None, **cache_options):
+        canary = cache_options.pop('canary', None)
         if key:
-            if isinstance(key, (types.StringTypes, types.IntType, types.LongType, types.FloatType)):
-                key = lambda *args, **kwargs: [key]
+            if callable(key):
+                key_cb = key
+            else:
+                key_cb = lambda *args, **kwargs: [key]
 
         else:
-            key = lambda *args, **kwargs: []
+            key_cb = lambda *args, **kwargs: []
 
         def decorator(*args, **kwargs):
             # build the caching object
-            key_args = key(*args, **kwargs)
+            key_args = key_cb(*args, **kwargs)
             c = cache_cls(*key_args)
             for k, n in cache_options.iteritems():
                 setattr(c, k, n)
 
             # get/set the cache
             ret = c.data
-            if ret is None:
+            if ret is canary:
                 ret = func(*args, **kwargs)
 
                 # cache the result
-                if ret is not None:
+                if ret is not canary:
                     c.data = ret
 
             return ret

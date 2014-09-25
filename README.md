@@ -1,7 +1,6 @@
 # Caches
 
-A Python caching library that gives a similar interface to standard Python data structures
-like Dict and Set but is backed by redis.
+A Python caching library that gives a similar interface to standard Python data structures like Dict and Set but is backed by redis.
 
 Caches was lovingly crafted for [First Opinion](http://firstopinion.co).
 
@@ -30,7 +29,7 @@ Caches will take care of parsing the url and creating the redis connection, auto
 
 ### Interface
 
-All caches caching classes have a similar interface, they take passed in constructor `*args` and concat them to create a key:
+All caches caching classes have a similar interface, they take the passed in constructor `*args` and concat them to create a key:
 
 ```python
 c = KeyCache('foo', 'bar', 'che')
@@ -73,6 +72,9 @@ This is the traditional caching object, it sets a value into a key:
 c = KeyCache('foo')
 c.data = 5 # cache 5
 c += 10 # increment 5 by 10, store 15 in the cache
+
+c.clear()
+print c # None
 ```
 
 
