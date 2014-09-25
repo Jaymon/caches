@@ -16,7 +16,7 @@ except ImportError:
 import dsnparse
 
 # first party
-from redis_collections import Dict, Set, RedisCollection, Counter
+from redis_collections import Dict, Set, RedisCollection, Counter, List
 from .collections import SortedSet
 from . import decorators
 
@@ -378,6 +378,7 @@ class KeyCache(Cache, RedisCollection):
         v = self.data
         return bool(v)
 
+
 class CounterCache(Cache, Counter):
     """
     A Python collections.Counter instance, but in Redis
@@ -395,6 +396,121 @@ class CounterCache(Cache, Counter):
 
         else:
             self.redis.hset(self.key, key, value)
+
+
+class ListCache(Cache, List):
+
+    def rpush(self, value): pass
+    def rpop(self, value): pass
+
+    def lpush(self, value): pass
+    def lpop(self, value): pass
+
+#    def _transaction(self, fn, *extra_keys):
+#        results = []
+#
+#        def trans(pipe):
+#            fn(pipe)
+#            if self.ttl:
+#                pout.v(self.ttl)
+#                pipe.expire(self.key, self.ttl)
+#            results.append(fn(pipe))
+#
+#        self.redis.transaction(trans, self.key, *extra_keys)
+#        return results[0]
+
+    def __setitem__(self, index, value):
+        if isinstance(index, slice):
+            super(ListCache, self).__setitem__(index, value)
+        else:
+            def set_trans(pipe):
+                size = pipe.llen(self.key)
+                if self._calc_overflow(size, index):
+                    raise IndexError(index)
+                pipe.multi()
+                pipe.lset(self.key, index, self._pickle(value))
+                if self.ttl:
+                    pipe.expire(self.key, self.ttl)
+
+            self._transaction(set_trans)
+
+    def insert(self, index, value):
+        def insert_trans(pipe):
+            size = pipe.llen(self.key)
+            pipe.multi()
+
+            pickled_value = self._pickle(value)
+            if index < 0 and abs(index) > size:
+                pipe.lpush(self.key, pickled_value)
+            elif index >= size:
+                pipe.rpush(self.key, pickled_value)
+            else:
+                pipe.lset(self.key, index, pickled_value)
+
+            if self.ttl:
+                pipe.expire(self.key, self.ttl)
+
+        self._transaction(insert_trans)
+
+
+class FixedListCache(ListCache):
+    """
+    This is a subset of ListCache that must have a max size and only has push and
+    pop methods for adding to the list (append is just an alias of push, as is 
+    extend)
+    """
+    size = 0
+
+    def push(self, value):
+        v = self._pickle(value)
+        with self.redis.pipeline() as pipe:
+            pipe.lpush(self.key, v)
+            pipe.ltrim(self.key, 0, self.size)
+            if self.ttl:
+                pipe.expire(self.key, self.ttl)
+
+            pipe.execute()
+
+    def pop(self):
+        return super(FixedListCache, self).pop(0)
+
+    def append(self, value):
+        self.push(value)
+
+    def __setitem__(self, index, value):
+        if isinstance(index, slice):
+            super(FixedListCache, self).__setitem__(index, value)
+        else:
+            def set_trans(pipe):
+                size = pipe.llen(self.key)
+                if self._calc_overflow(size, index):
+                    raise IndexError(index)
+                pipe.multi()
+                pipe.lset(self.key, index, self._pickle(value))
+                pipe.ltrim(self.key, 0, self.size)
+                if self.ttl:
+                    pipe.expire(self.key, self.ttl)
+
+            self._transaction(set_trans)
+
+    def insert(self, index, value):
+        def insert_trans(pipe):
+            size = pipe.llen(self.key)
+            pipe.multi()
+
+            pickled_value = self._pickle(value)
+            if index < 0 and abs(index) > size:
+                pipe.lpush(self.key, pickled_value)
+            elif index >= size:
+                pipe.rpush(self.key, pickled_value)
+            else:
+                pipe.lset(self.key, index, pickled_value)
+
+            pipe.ltrim(self.key, 0, self.size)
+            if self.ttl:
+                pipe.expire(self.key, self.ttl)
+
+        self._transaction(insert_trans)
 
 
 configure_environ()

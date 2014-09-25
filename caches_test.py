@@ -13,7 +13,8 @@ log_handler.setFormatter(log_formatter)
 logger.addHandler(log_handler)
 
 import caches
-from caches import DictCache, SetCache, KeyCache, SortedSetCache, CounterCache
+from caches import DictCache, SetCache, KeyCache, SortedSetCache, CounterCache, \
+    ListCache
 from caches.collections import CountingSet, SortedSet
 from caches.decorators import cached
 
@@ -24,6 +25,24 @@ def setUpModule():
     for interface_name, i in caches.interfaces.iteritems():
         i.flush()
         pass
+
+
+class ListCacheTest(TestCase):
+    def test_ttl(self):
+        c = ListCache('ListCache', 'ttl')
+        c.ttl = 1
+
+        c.append(100)
+        r = c[0]
+        self.assertEqual(100, r)
+
+        time.sleep(1.1)
+        with self.assertRaises(IndexError):
+            r = c[0]
+
+
+class FixedListCacheTest(TestCase):
+
 
 
 class SortedSetTest(TestCase):

@@ -13,6 +13,22 @@ from itertools import imap
 from redis_collections import RedisCollection
 
 
+#class List(RedisCollection):
+#    def __init__(self, *args, **kwargs):
+#        super(List, self).__init__(*args, **kwargs)
+#
+#    # append
+#    # count
+#    # extend
+#    # index
+#    # insert
+#    # pop
+#    # remove
+#    # reverse
+#    # sort
+#    # push
+
+
 class SortedSet(RedisCollection, collections.MutableSet):
     """
     Sorted set uses a similar api to Python's built in set but offers the ability
@@ -25,7 +41,7 @@ class SortedSet(RedisCollection, collections.MutableSet):
         addnx -- addition to native api, will only add the elem if it doesn't already exist
 
         currently there is no union or intersect support
-    
+
     http://docs.python.org/2/library/stdtypes.html#set
     http://code.activestate.com/recipes/576694/
     http://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
