@@ -231,6 +231,7 @@ class DictCache(Cache, Dict):
         else:
             p = self.redis.hset(self.key, key, value)
 
+
 class SetCache(Cache, Set):
     """
     A Python set but in Redis
@@ -379,6 +380,7 @@ class KeyCache(Cache, RedisCollection):
     def __nonzero__(self):
         v = self.data
         return bool(v)
+
 
 class CounterCache(Cache, Counter):
     """

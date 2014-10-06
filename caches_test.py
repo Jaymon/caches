@@ -299,12 +299,10 @@ class KeyCacheTest(TestCase):
         r = calculate("five")
         self.assertEqual("five", r)
 
-
     def test___del__(self):
         c = KeyCache('KeyCache.__del__')
         del(c.data)
         # if it doesn't raise an error, it worked correctly
-
 
 
 class SetCacheTest(TestCase):
