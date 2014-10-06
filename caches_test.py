@@ -285,6 +285,21 @@ class KeyCacheTest(TestCase):
         self.assertEqual(8, r)
         self.assertEqual(2, self.called_count)
 
+    def test_duplicate_cached(self):
+        class TDCached(KeyCache):
+            prefix = 'Keycache.tdcached'
+            ttl = 360
+
+        @TDCached.cached(lambda x: str(x))
+        def calculate(x):
+            return x
+
+        r = calculate("five")
+        r = calculate("five")
+        r = calculate("five")
+        self.assertEqual("five", r)
+
+
     def test___del__(self):
         c = KeyCache('KeyCache.__del__')
         del(c.data)

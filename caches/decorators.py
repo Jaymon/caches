@@ -56,6 +56,9 @@ class cached(FuncDecorator):
         def decorator(*args, **kwargs):
             # build the caching object
             key_args = key_cb(*args, **kwargs)
+            if isinstance(key_args, basestring):
+                key_args = [key_args]
+
             c = cache_cls(*key_args)
             for k, n in cache_options.iteritems():
                 setattr(c, k, n)
