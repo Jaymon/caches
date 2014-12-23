@@ -111,6 +111,7 @@ This caching object acts more or less like a Python [set](http://docs.python.org
 * The pop() method will pop off the lowest score from the set, and pops a tuple: (elem, score)
 * An rpop() method allows you to pop the highest score from the set.
 * Iterating through the set results in tuples of (elem, score), not just elem like in a normal set or the `SetCache`.
+* The chunk(limit, offset) and rchunk(limit, offset) methods will work through sections of the list working either forwards or backwards.
 
 ```python
 c = SortedSetCache('foo')

@@ -25,7 +25,7 @@ class SortedSet(RedisCollection, collections.MutableSet):
         addnx -- addition to native api, will only add the elem if it doesn't already exist
 
         currently there is no union or intersect support
-    
+
     http://docs.python.org/2/library/stdtypes.html#set
     http://code.activestate.com/recipes/576694/
     http://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
@@ -63,26 +63,20 @@ class SortedSet(RedisCollection, collections.MutableSet):
         return self.redis.zrem(self.key, self._pickle(elem))
 
     def _data(self, pipe=None, last=False):
-        redis = pipe if pipe is not None else self.redis
         limit = 500
         offset = 0
-        while True:
-            vals = redis.zrange(
-                self.key,
-                offset,
-                offset + limit,
-                desc=last,
-                withscores=True,
-                score_cast_func=int
-            )
 
-            if vals:
-                for v in vals:
-                    yield self._unpickle(v[0]), v[1]
+        has_more = True
+        while has_more:
+            has_more = False
+            count = 0
+            for v in self._chunk(limit, offset, last, pipe):
+                count += 1
+                yield v
 
+            has_more = count >= limit
+            if has_more:
                 offset += limit
-                offset += 1
-
             else:
                 break
 
@@ -91,6 +85,30 @@ class SortedSet(RedisCollection, collections.MutableSet):
 
     def __reversed__(self):
         return self._data(last=True)
+
+    def chunk(self, limit, offset, last=False):
+        """return all the elements either in ascending (last=False) or descending (last=True) order"""
+        return self._chunk(limit, offset, last=last, pipe=self.redis)
+
+    def rchunk(self, limit, offset):
+        """just here for consistancy, see chunk"""
+        return self.chunk(limit, offset, last=True, pipe=pipe)
+
+    def _chunk(self, limit, offset, last=False, pipe=None):
+        """return limit elements of the set starting at offset"""
+        redis = pipe if pipe is not None else self.redis
+        vals = redis.zrange(
+            self.key,
+            offset,
+            offset + (limit - 1),
+            desc=last,
+            withscores=True,
+            score_cast_func=int
+        )
+
+        if vals:
+            for v in vals:
+                yield self._unpickle(v[0]), v[1]
 
     def _update(self, data, pipe=None):
         super(SortedSet, self)._update(data, pipe)

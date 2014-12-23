@@ -60,6 +60,23 @@ class SortedSetTest(TestCase):
             self.assertEqual(0, r_score)
             self.assertEqual('bar', r_elem)
 
+    def test_iter(self):
+        test_s = set()
+        total = 502
+        s = self.get_set()
+        for x in range(total):
+            v = 'x{}'.format(x)
+            s.add(v, x)
+            test_s.add(v)
+
+        self.assertEqual(total, len(s))
+
+        count = 0
+        for elem, rank in s:
+            count += 1
+            test_s.remove(elem)
+        self.assertEqual(total, count)
+
 
 class CountingSetTest(TestCase):
 
