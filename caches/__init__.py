@@ -21,7 +21,7 @@ from .collections import SortedSet
 from . import decorators
 
 
-__version__ = '0.2.17'
+__version__ = '0.2.18'
 
 logger = logging.getLogger(__name__)
 

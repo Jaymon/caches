@@ -92,7 +92,7 @@ class SortedSet(RedisCollection, collections.MutableSet):
 
     def rchunk(self, limit, offset):
         """just here for consistancy, see chunk"""
-        return self.chunk(limit, offset, last=True, pipe=pipe)
+        return self.chunk(limit, offset, last=True)
 
     def _chunk(self, limit, offset, last=False, pipe=None):
         """return limit elements of the set starting at offset"""
