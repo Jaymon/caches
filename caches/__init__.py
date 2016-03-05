@@ -21,7 +21,7 @@ from .collections import SortedSet
 from . import decorators
 
 
-__version__ = '0.2.19'
+__version__ = '0.2.18'
 
 logger = logging.getLogger(__name__)
 
@@ -134,15 +134,8 @@ class Cache(object):
     key_args = None
 
     def __init__(self, *args, **kwargs):
-        self.key_args = self.get_key_args(*args, **kwargs)
+        self.key_args = args
         super(Cache, self).__init__(data=kwargs.get('data', None))
-
-    def get_key_args(self, *args, **kwargs):
-        if args:
-            return args
-        if 'key' in kwargs:
-            key = str(kwargs['key'])
-            return tuple([key.replace(self.prefix + '.', '')])
 
     @classmethod
     def create(cls, *args, **kwargs):
