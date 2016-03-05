@@ -53,7 +53,7 @@ class SortedSetTest(TestCase):
             self.assertEqual(5, r_score)
             self.assertEqual('foo', r_elem)
 
-        s = SortedSet()
+        s = self.get_set()
         s.addnx('bar', 0)
         s.addnx('bar', 1)
         for r_elem, r_score in s:
@@ -343,6 +343,14 @@ class SetCacheTest(TestCase):
         self.assertFalse(c.has())
         c.add(1)
         self.assertTrue(c.has())
+
+    def test_update(self):
+        c = SetCache(42)
+        c.add(1)
+        c.update([1,2,3])
+        self.assertEqual(3, len(c))
+        for value in [1,2,3]:
+            self.assertTrue(value in c)
 
 
 class DictCacheTest(TestCase):
