@@ -1,4 +1,5 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, division, print_function, absolute_import
 import logging
 import itertools
 import types
@@ -6,9 +7,46 @@ import types
 import redis
 from redis.client import StrictPipeline, Script
 
-from . import CacheError
+from .exception import CacheError
+
 
 logger = logging.getLogger(__name__)
+
+
+interfaces = {}
+"""holds all the configured interfaces"""
+
+
+def get_interfaces():
+    global interfaces
+    return interfaces
+
+
+def get_interface(name=''):
+    """
+    get an interface that was created using configure()
+
+    name -- string -- the name of the connection for the interface to return
+    """
+    global interfaces
+    return interfaces[name]
+
+
+def set_interface(interface, name=''):
+    """
+    don't want to bother with a dsn? Use this method to make an interface available
+    """
+    if not interface:
+        raise ValueError('interface is empty')
+
+    global interfaces
+    logger.debug('connection_name: "{}" -> {}.{}'.format(name, interface.__module__, interface.__class__.__name__))
+    interfaces[name] = interface
+
+
+
+
+
 
 class RedisMixin(object):
 
