@@ -6,122 +6,54 @@ from .core import Cache, BaseCache
 
 
 class ObjectCache(BaseCache):
-    serialize = True
+
+    def __init__(self, key, data=None, **kwargs):
+        #self.__origclass__ = self.__class__
+
+        for k in ["serialize", "prefix", "ttl", "connection_name", "default"]:
+            kwargs.setdefault(k, getattr(self, k))
+
+        self._cache = Cache(key, data, **kwargs)
 
     def __setattr__(self, name, val):
-        if name in ["_data", "data", "key"]:
+        if name in ["_cache"]:
             #self.__dict__[name] = val
             super(ObjectCache, self).__setattr__(name, val)
 
         else:
-            data = self.data
-            setattr(data, name, val)
-            self.data = data
+            c = self._cache
+            o = c.data
+            setattr(o, name, val)
+            c.data = o
 
     def __delattr__(self, name):
-        try:
-            super(ObjectCache, self).__delattr__(name)
-        except AttributeError:
-            data = self.data
-            delattr(data, name)
-            self.data = data
+        c = self._cache
+        o = c.data
+        delattr(o, name)
+        c.data = o
 
     def __getattribute__(self, name):
-        if name == "__class__":
+        if name == "_cache":
+            ret = super(ObjectCache, self).__getattribute__(name)
+
+        elif name == "__class__":
             try:
-                data = super(ObjectCache, self).__getattribute__("data")
-                if data is not None:
-                    ret = data.__class__
+                o = self._cache.data
+                if o is not None:
+                    ret = o.__class__
 
             except AttributeError:
                 ret = super(ObjectCache, self).__getattribute__(name)
-
-        elif name == "_data":
-            ret = super(ObjectCache, self).__getattribute__(name)
 
         else:
             try:
                 ret = super(ObjectCache, self).__getattribute__(name)
             except AttributeError:
-                data = super(ObjectCache, self).__getattribute__("data")
-                if data is not None:
-                    ret = getattr(data, name) 
+                o = self._cache.data
+                if o is not None:
+                    ret = getattr(o, name) 
 
         return ret
-
-        ret = None
-        klass = super(ObjectCache, self).__getattribute__("__class__")
-        origklass = super(ObjectCache, self).__getattribute__("__origclass__")
-
-        if klass is not origklass:
-            try:
-                ret = super(ObjectCache, self).__getattribute__(name)
-            #ret = getattr(self.__origclass__, name, None)
-            except AttributeError:
-                data = super(ObjectCache, self).__getattribute__("data")
-                ret = getattr(data, name) 
-
-        return ret
-
-
-
-        ret = None
-        klass = super(ObjectCache, self).__getattribute__("__class__")
-        origklass = super(ObjectCache, self).__getattribute__("__origclass__")
-
-        if klass is not origklass:
-            try:
-                ret = super(ObjectCache, self).__getattribute__(name)
-            #ret = getattr(self.__origclass__, name, None)
-            except AttributeError:
-                data = super(ObjectCache, self).__getattribute__("object")
-                ret = getattr(data, name) 
-
-        return ret
-
-#         if name == "__dict__":
-#             return super(
-# 
-#             ret = super(Redis, self).__getattribute__(name)
-# 
-# 
-#         if name == "_data":
-#             raise AttributeError(name)
-# 
-#         else:
-#             ret = None
-#             if self.__class__ is not self.__origclass__:
-#                 ret = getattr(self.__origclass__, name, None)
-#             if not ret:
-#                 ret = getattr(self.data, name) 
-# 
-#         return ret
-
-    def __instancecheck__(self, instance):
-        pout.v(instance)
-        return False
-
-    def __subclasscheck__(self, instance):
-        pout.v(instance)
-        return False
-
-#     def _update(self, data, pipe=None):
-#         p = pipe
-#         exe = False
-#         if pipe is None and self.ttl:
-#             p = self.redis.pipeline()
-#             exe = True
-# 
-#         super(Cache, self)._update(data, pipe=p)
-# 
-#         if p:
-#             if self.ttl:
-#                 p.expire(self.key, self.ttl)
-#             if exe:
-#                 p.execute()
-
-
-
 
 
 class ImmutableCache(Cache):

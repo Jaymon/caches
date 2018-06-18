@@ -101,8 +101,12 @@ class Cache(BaseCache):
         if data:
             self.data = data
 
-        elif "val" in kwargs:
-            self._data = kwargs["val"]
+        if "val" in kwargs:
+            self._data = kwargs.pop("val")
+
+        # allow for overriding class value with passed in values
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def clear(self):
         del self.data
