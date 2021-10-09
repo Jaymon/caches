@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import logging
-import itertools
-import types
 
 import redis
-from redis.client import StrictPipeline, Script
+from redis.client import Pipeline, Script
 
+from .compat import *
 from .exception import CacheError
 
 
@@ -44,12 +43,7 @@ def set_interface(interface, name=''):
     interfaces[name] = interface
 
 
-
-
-
-
 class RedisMixin(object):
-
     log_key = set(['DEL', 'DUMP', 'EXISTS', 'EXPIRE', 'EXPIREAT', 'MOVE', 'PERSIST',
                 'PEXPIRE', 'PEXPIREAT', 'PTTL', 'RENAME', 'RENAMENX', 'RESTORE',
                 'SORT', 'TTL', 'TYPE', 'HGETALL', 'HKEYS', 'HLEN', 'HVALS', 'SADD',
@@ -94,11 +88,19 @@ class RedisMixin(object):
             format_args.append(args[0])
             format_args.append(args[1])
 
+            #if len(args) > 2:
+            #    format_log += " - VALUES: {}"
+            #    format_args.append(args[2:])
+
         elif args[0] in self.log_key_field:
             format_log += ' - {} > {}'
             format_args.append(args[0])
             format_args.append(args[1])
             format_args.append(args[2])
+
+            #if len(args) > 3:
+            #    format_log += " - VALUES: {}"
+            #    format_args.append(args[3:])
 
         elif args[0] in self.log_script:
             format_log += ' - {}'
@@ -117,7 +119,7 @@ class RedisMixin(object):
                 format_args.append(res)
 
             else:
-                if isinstance(res, types.StringTypes):
+                if isinstance(res, basestring):
                     format_log += ' ... string'
 
                 elif isinstance(res, list):
@@ -130,7 +132,6 @@ class RedisMixin(object):
 
                 else:
                     format_log += ' ... unknown'
-                    #pout.v(res)
 
         self.log(format_log, *format_args)
 
@@ -145,7 +146,7 @@ class RedisMixin(object):
         return pipeline
 
 
-class RedisPipeline(RedisMixin, StrictPipeline):
+class RedisPipeline(RedisMixin, Pipeline):
     def _execute_pipeline(self, connection, commands, raise_on_error):
         self.log('Execute {} Pipeline commands', len(commands))
         res = super(RedisPipeline, self)._execute_pipeline(connection, commands, raise_on_error)
@@ -157,13 +158,6 @@ class RedisPipeline(RedisMixin, StrictPipeline):
         return res
 
     def execute_command(self, *args, **kwargs):
-#        if args[0] in self.log_key:
-#            self.log("{} QUEUED - {}", args[0], args[1])
-#        elif args[0] in self.log_key_field:
-#            self.log("{} QUEUED - {} > {}", args[0], args[1], args[2])
-#        elif args[0] in self.log_script:
-#            self.log("LUA QUEUED - {}", args[3])
-
         res = super(RedisPipeline, self).execute_command(*args, **kwargs)
         self.log_call(args, res, is_pipe=True)
         return res
@@ -171,8 +165,6 @@ class RedisPipeline(RedisMixin, StrictPipeline):
 
 class Redis(RedisMixin, redis.StrictRedis):
     def __init__(self, **connection_config):
-        connection_config['socket_timeout'] = float(connection_config.get('socket_timeout', 1.0))
-        connection_config['port'] = int(connection_config.get('port') or 6379)
         try:
             super(Redis, self).__init__(**connection_config)
             self.log('Connected using config {}', connection_config)
@@ -192,20 +184,12 @@ class Redis(RedisMixin, redis.StrictRedis):
 
         return ret
 
-    def flush(self):
+    def flush_unsafe(self):
         """this will clear the entire cache db, be careful with this"""
         self.log('FLUSH DB {}', self.connection_pool.connection_kwargs['db'])
-        #return self._dispatch(self._flush)
         return self.flushdb()
 
     def execute_command(self, *args, **kwargs):
-#        if args[0] in self.log_key:
-#            self.log("{} - {}", args[0], args[1])
-#        elif args[0] in self.log_key_field:
-#            self.log("{} - {} > {}", args[0], args[1], args[2])
-#        elif args[0] in self.log_script:
-#            self.log("LUA - {}", args[3])
-
         res = super(Redis, self).execute_command(*args, **kwargs)
         self.log_call(args, res)
         return res

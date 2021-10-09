@@ -5,57 +5,6 @@ from .core import Cache, BaseCache
 
 
 
-class ObjectCache(BaseCache):
-
-    def __init__(self, key, data=None, **kwargs):
-        #self.__origclass__ = self.__class__
-
-        for k in ["serialize", "prefix", "ttl", "connection_name", "default"]:
-            kwargs.setdefault(k, getattr(self, k))
-
-        self._cache = Cache(key, data, **kwargs)
-
-    def __setattr__(self, name, val):
-        if name in ["_cache"]:
-            #self.__dict__[name] = val
-            super(ObjectCache, self).__setattr__(name, val)
-
-        else:
-            c = self._cache
-            o = c.data
-            setattr(o, name, val)
-            c.data = o
-
-    def __delattr__(self, name):
-        c = self._cache
-        o = c.data
-        delattr(o, name)
-        c.data = o
-
-    def __getattribute__(self, name):
-        if name == "_cache":
-            ret = super(ObjectCache, self).__getattribute__(name)
-
-        elif name == "__class__":
-            try:
-                o = self._cache.data
-                if o is not None:
-                    ret = o.__class__
-
-            except AttributeError:
-                ret = super(ObjectCache, self).__getattribute__(name)
-
-        else:
-            try:
-                ret = super(ObjectCache, self).__getattribute__(name)
-            except AttributeError:
-                o = self._cache.data
-                if o is not None:
-                    ret = getattr(o, name) 
-
-        return ret
-
-
 class ImmutableCache(Cache):
     serialize = False
     def __init__(self, *args, **kwargs):
