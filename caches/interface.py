@@ -164,6 +164,10 @@ class RedisPipeline(RedisMixin, Pipeline):
 
 
 class Redis(RedisMixin, redis.StrictRedis):
+    """
+    https://github.com/andymccurdy/redis-py
+    https://github.com/andymccurdy/redis-py/blob/master/redis/commands.py
+    """
     def __init__(self, **connection_config):
         try:
             super(Redis, self).__init__(**connection_config)

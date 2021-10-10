@@ -42,8 +42,7 @@ class DSN(dsnparse.ParseResult):
         if not self.port:
             self.port = 6379
 
-        self.query.setdefault("socket_timeout", 1.0)
-        self.query["socket_timeout"] = float(self.query["socket_timeout"])
+        self.query["socket_timeout"] = float(self.query.get("socket_timeout", 1.0))
 
     def configure_scheme(self, v):
         ret = v
@@ -85,8 +84,8 @@ def configure_environ(dsn_env_name='CACHES_DSN', parse_class=DSN):
         export CACHES_DSN_1=redis://host:port/dbname#conn_name_1
         export CACHES_DSN_2=redis://host2:port/dbname2#conn_name_2
         $ python
-        >>> import caches
-        >>> print caches.interfaces # prints a dict with interfaces conn_name_1 and
+        >>> import caches.interface
+        >>> print caches.interface.interfaces # prints a dict with interfaces conn_name_1 and
         conn_name_2 keys
 
     :param dsn_env_name: string, the name of the environment variables

@@ -18,13 +18,6 @@ from caches.core import (
 
 
 class CacheTest(TestCase):
-    def test_clear_unsafe(self):
-        Cache("foo", 1)
-        Cache("bar", 1)
-        Cache("foo.bar", 1)
-
-        Cache.clear_unsafe("foo*")
-
     def test_lifecycle(self):
         key = "c.lifecycle"
         c = Cache(key)
@@ -122,10 +115,10 @@ class CacheTest(TestCase):
         c.data = 0
         self.assertFalse(bool(c))
 
-    def test_normalize(self):
+    def test_normalize_data(self):
 
         class TKC(Cache):
-            def normalize(self, val):
+            def normalize_data(self, val):
                 if val is None: val = 0
                 return int(val)
 

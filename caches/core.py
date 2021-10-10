@@ -46,12 +46,12 @@ class BaseCache(object):
         return dec
 
     def __init__(self, key, data=None, **kwargs):
-        self.key = self.normalize_key(key)
-        self.update(data)
-
         # allow for overriding class value with passed in values
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+        self.key = self.normalize_key(key)
+        self.update(data)
 
     def normalize_key(self, key):
         if isinstance(key, basestring):
@@ -469,6 +469,10 @@ class SortedSetCache(SetCache):
         score = self.normalize_score(score)
         data = self.to_interface(self.normalize_data(elem))
         with self.pipeline() as pipe:
+            # https://github.com/andymccurdy/redis-py/issues/625
+            # https://github.com/redis/redis/pull/1132
+            # https://github.com/redis/redis/issues/1128
+            # https://redis.io/commands/zadd
             pipe.zadd(self.key, {data: score}, **kwargs)
             if self.ttl:
                 pipe.expire(self.key, self.normalize_ttl(self.ttl))

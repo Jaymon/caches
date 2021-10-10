@@ -1,8 +1,8 @@
 # Caches
 
-A Python caching library that gives a similar interface to standard Python data structures like Dict and Set but is backed by redis.
+A Python caching library that gives a similar interface to standard Python data structures like Dict and Set but is backed by [Redis](https://redis.io).
 
-Caches was lovingly crafted for [First Opinion](http://firstopinion.co).
+Caches has been used in production for years across many different products, handling millions of requests.
 
 
 ## How to use
@@ -29,17 +29,17 @@ Caches will take care of parsing the url and creating the redis connection, auto
 
 ### Interface
 
-All caches caching classes have a similar interface, they take the passed in constructor `*args` and concat them to create a key:
+All caches caching classes have a similar interface, their constructor takes a key and data:
 
 ```python
-c = KeyCache('foo', 'bar', 'che')
+c = Cache(['foo', 'bar', 'che'])
 print c.key # foo.bar.che
 ```
 
 If you would like to init your cache object with a value, use the `data` `**kwarg`:
 
 ```python
-c = KeyCache('foo', data="boom!")
+c = Cache('foo', data="boom!")
 print c.key # foo
 print c # "boom!"
 ```
@@ -50,12 +50,12 @@ Each caches base caching class is meant to be extended so you can set some param
 
 * **prefix** -- string -- This will be prepended to the key args you pass into the constructor.
 
-* **ttl** -- integer -- time to live, how many seconds to cache the value. Set to like 2 hours by default, 0 means live forevor.
+* **ttl** -- integer -- time to live, how many seconds to cache the value. 0 (default) means cache forever.
 
 * **connection_name** -- string -- if you have more than one caches dsn then you can use this to set the name of the connection you want (the name of the connection is the `#connection_name` fragment of a dsn url).
 
 ```python
-class MyIntCache(KeyCache):
+class MyIntCache(Cache):
   serialize = False # don't bother to serialize values since we're storing ints
   prefix = "MyIntCache" # every key will have this prefix, change to invalidate all currently cached values
   ttl = 7200 # store each int for 2 hours
@@ -64,12 +64,12 @@ class MyIntCache(KeyCache):
 ### Cache Classes
 
 
-#### KeyCache
+#### Cache
 
 This is the traditional caching object, it sets a value into a key:
 
 ```python
-c = KeyCache('foo')
+c = Cache('foo')
 c.data = 5 # cache 5
 c += 10 # increment 5 by 10, store 15 in the cache
 
@@ -80,14 +80,14 @@ print c # None
 
 #### DictCache
 
-This caching object acts more or less like a Python [dictionary](http://docs.python.org/2/library/stdtypes.html#mapping-types-dict):
+This caching object acts more or less like a Python [dictionary](http://docs.python.org/3/library/stdtypes.html#mapping-types-dict):
 
 ```python
 c = DictCache('foo')
 c['bar'] = 'b'
 c['che'] = 'c'
-for key, val in c.iteritems():
-  print key, val # will print bar b and then che c
+for key, val in c.items():
+  print key, val # will print "bar b" and then "che c"
 ```
 
 
@@ -107,46 +107,48 @@ print 'che' in c # True
 
 This caching object acts more or less like a Python [set](http://docs.python.org/2/library/stdtypes.html#set) but has some changes:
 
-* The add() method can take a score value
-* The pop() method will pop off the lowest score from the set, and pops a tuple: (elem, score)
-* An rpop() method allows you to pop the highest score from the set.
-* Iterating through the set results in tuples of (elem, score), not just elem like in a normal set or the `SetCache`.
-* The chunk(limit, offset) and rchunk(limit, offset) methods will work through sections of the list working either forwards or backwards.
+* The `add()` method takes a tuple `(score, elem)`
+* The `pop()` method will pop off the lowest score from the set, and pops a tuple `(score, elem)`
+* An `rpop()` method allows you to pop the highest score from the set.
+* Iterating through the set results in tuples of `(score, elem)`, not just elem like in a normal set or the `SetCache`.
 
 ```python
 c = SortedSetCache('foo')
-c.add('bar', 1)
-c.add('che', 10)
+c.add((1, 'bar'))
+c.add((10, 'che'))
 print 'che' in c # True
-print c.pop() # (bar, 1)
+print c.pop() # (1, bar)
 ```
 
 
-#### CounterCache
+#### SentinelCache
 
-This caching object acts more or less like a Python [collections.Counter](http://docs.python.org/2/library/collections.html#collections.Counter):
+Handy for gated access:
 
 ```python
-c = CounterCache('foo')
-c['bar'] = 5
-c['bar'] += 5
+c = SentinelCache('foo')
 
-print c['bar'] # 10
+if not c:
+    print("sentinel value isn't set so do this")
+
+if not c:
+    print("sentinel value is now set so this will never run")
 ```
 
 
 ### Decorator
 
-Caches exposes a decorator to make caching the return value of a function easy. This only works for `KeyCache` derived caching.
+Caches exposes a decorator to make caching the return value of a function easy. This only works for `Cache` derived caching.
 
 The `cached` decorator can accept a caching class and also a key function (similar to the python [built-in `sorted()` function](http://docs.python.org/2/library/functions.html#sorted) key argument), except caches key argument returns a list that can be passed to the constructor of the caching class as `*args`.
 
 ```python
-from caches import KeyCache
+import functools
+from caches import Cache
 
-@KeyCache.cached(key="some_cache_key")
+@Cache.cached(key="some_cache_key")
 def foo(*args):
-    return reduce(lambda x, y: x+y, args)
+    return functools.reduce(lambda x, y: x+y, args)
 
 foo(1, 2) # will compute the value and cache the return value
 foo(1, 2) # return value from cache
@@ -157,9 +159,9 @@ foo(1, 2, 3) # uh-oh, wrong value, our key was too static
 Let's try again, this time with a dynamic key
 
 ```python
-@KeyCache.cached(key=lambda *args: args)
+@Cache.cached(key=lambda *args: args)
 def foo(*args):
-    return reduce(lambda x, y: x+y, args)
+    return functools.reduce(lambda x, y: x+y, args)
 
 foo(1, 2) # compute and cache, key func returned [1, 2]
 foo(1, 2) # grabbed from cache
@@ -169,11 +171,11 @@ foo(1, 2, 3) # compute and cache because our key func returned [1, 2, 3]
 What about custom caches classes?
 
 ```python
-class CustomCache(KeyCache): pass
+class CustomCache(Cache): pass
 
 @CustomCache.cached(key=lambda *args: args)
 def foo(*args):
-    return reduce(lambda x, y: x+y, args)
+    return functools.reduce(lambda x, y: x+y, args)
 ```
 
 
@@ -185,14 +187,8 @@ Use pip from pypi:
 
 or from source using pip:
 
-    pip install git+https://github.com/firstopinion/caches#egg=caches
+    pip install -u "git+https://github.com/jaymon/caches#egg=caches"
 
-
-## Acknowledgements
-
-Caches uses the very cool [redis_collections module](https://redis-collections.readthedocs.org/en/latest/).
-
-Some of the interface is inspired from a module that [Ryan Johnson](https://github.com/bismark) wrote for Undrip.
 
 
 ## License
@@ -201,5 +197,6 @@ MIT
 
 ## Other links
 
-[Dogpile](http://dogpilecache.readthedocs.org/en/latest/usage.html)
+* [redis_collections module](https://github.com/redis-collections/redis-collections) - If you need broader/deeper support for python standard types like dict and set then check out this project. Prior to 2.0.0 Caches had a dependency on this module.
+* [Dogpile](http://dogpilecache.readthedocs.org/en/latest/usage.html)
 
