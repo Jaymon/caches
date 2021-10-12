@@ -15,13 +15,13 @@ from .dsn import configure, configure_environ
 from .decorators import cached
 
 
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 
 logger = logging.getLogger(__name__)
 
 
-def clear_unsafe(pattern):
+def unsafe_clear(pattern):
     """Clear the keys matching pattern
 
     This uses scan to find keys matching pattern (eg, foo*) and delets them one

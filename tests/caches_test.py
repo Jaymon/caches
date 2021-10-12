@@ -9,7 +9,7 @@ from . import TestCase
 
 
 class CachesTest(TestCase):
-    def test_clear_unsafe(self):
+    def test_unsafe_clear(self):
         Cache("foo", 1, prefix="foo")
         Cache("bar", 1, prefix="che")
         Cache("bar", 1, prefix="foo")
@@ -17,7 +17,7 @@ class CachesTest(TestCase):
         c = Cache("foo", prefix="foo")
         self.assertTrue(c.exists())
 
-        count = caches.clear_unsafe("foo*")
+        count = caches.unsafe_clear("foo*")
         self.assertEqual(2, count)
 
         c = Cache("foo", prefix="foo")

@@ -188,7 +188,7 @@ class Redis(RedisMixin, redis.StrictRedis):
 
         return ret
 
-    def flush_unsafe(self):
+    def unsafe_flush(self):
         """this will clear the entire cache db, be careful with this"""
         self.log('FLUSH DB {}', self.connection_pool.connection_kwargs['db'])
         return self.flushdb()

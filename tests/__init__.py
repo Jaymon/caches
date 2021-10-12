@@ -19,7 +19,7 @@ class TestCase(BaseTestCase):
         http://docs.python.org/2/library/unittest.html#setupmodule-and-teardownmodule
         """
         for interface_name, i in caches.get_interfaces().items():
-            i.flush_unsafe()
+            i.unsafe_flush()
             pass
 
         caches.interface.interfaces = {}
