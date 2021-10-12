@@ -187,7 +187,7 @@ Use pip from pypi:
 
 or from source using pip:
 
-    pip install -u "git+https://github.com/jaymon/caches#egg=caches"
+    pip install -U "git+https://github.com/jaymon/caches#egg=caches"
 
 
 
