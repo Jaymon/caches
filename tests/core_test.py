@@ -51,6 +51,12 @@ class CacheTest(TestCase):
         self.assertEqual(6, int(c3))
 
     def test_key(self):
+        c = Cache("foo", prefix="prefix")
+        self.assertEqual("prefix.foo", c.key)
+
+        c = Cache(1, prefix="prefix")
+        self.assertEqual("prefix.1", c.key)
+
         c = Cache(['kfoo', 'bar'])
         self.assertEqual(None, c.data)
 
@@ -115,8 +121,7 @@ class CacheTest(TestCase):
         c.data = 0
         self.assertFalse(bool(c))
 
-    def test_normalize_data(self):
-
+    def test_normalize_data_1(self):
         class TKC(Cache):
             def normalize_data(self, val):
                 if val is None: val = 0

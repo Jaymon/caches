@@ -54,7 +54,7 @@ class BaseCache(object):
         self.update(data)
 
     def normalize_key(self, key):
-        if isinstance(key, basestring):
+        if isinstance(key, (basestring, int)):
             key = [key]
         prefixes = [self.normalize_prefix(self.prefix)]
         return '.'.join(map(String, itertools.chain(prefixes, key)))
