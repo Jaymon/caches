@@ -28,7 +28,7 @@ class DSN(dsnparse.ParseResult):
             host=self.host,
             port=self.port,
             password=self.password,
-            **self.query
+            **self.query_params
         )
         paths = self.paths
         if paths:
@@ -36,18 +36,25 @@ class DSN(dsnparse.ParseResult):
         return connection_config
 
     def configure(self):
+        # https://redis.readthedocs.io/en/stable/examples/ssl_connection_examples.html#Connecting-to-a-Redis-instance-via-SSL.
+        if "rediss" in self.scheme:
+            self.query_params["ssl"] = True
+            #self.query_params["ssl_cert_reqs"] = "none"
+
         self.scheme = self.configure_scheme(self.scheme)
         self.password = self.configure_password(self.username, self.password)
 
         if not self.port:
             self.port = 6379
 
-        self.query["socket_timeout"] = float(self.query.get("socket_timeout", 1.0))
+        self.query_params["socket_timeout"] = float(
+            self.query_params.get("socket_timeout", 1.0)
+        )
 
     def configure_scheme(self, v):
         ret = v
         d = {
-            "caches.interface.Redis": set(["redis"]),
+            "caches.interface.Redis": set(["redis", "rediss"]),
         }
 
         kv = v.lower()

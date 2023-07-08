@@ -15,7 +15,7 @@ from .dsn import configure, configure_environ
 from .decorators import cached
 
 
-__version__ = '2.0.2'
+__version__ = '3.0.0'
 
 
 logger = logging.getLogger(__name__)

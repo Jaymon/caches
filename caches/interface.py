@@ -3,7 +3,9 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import logging
 
 import redis
-from redis.client import Pipeline, Script
+from redis.client import Pipeline
+from redis.commands.core import Script
+from datatypes import LogMixin
 
 from .compat import *
 from .exception import CacheError
@@ -39,46 +41,43 @@ def set_interface(interface, name=''):
         raise ValueError('interface is empty')
 
     global interfaces
-    logger.debug('connection_name: "{}" -> {}.{}'.format(name, interface.__module__, interface.__class__.__name__))
+    logger.debug('connection_name: "{}" -> {}.{}'.format(
+        name,
+        interface.__module__,
+        interface.__class__.__name__
+    ))
     interfaces[name] = interface
 
 
-class RedisMixin(object):
-    log_key = set(['DEL', 'DUMP', 'EXISTS', 'EXPIRE', 'EXPIREAT', 'MOVE', 'PERSIST',
-                'PEXPIRE', 'PEXPIREAT', 'PTTL', 'RENAME', 'RENAMENX', 'RESTORE',
-                'SORT', 'TTL', 'TYPE', 'HGETALL', 'HKEYS', 'HLEN', 'HVALS', 'SADD',
-                'SCARD', 'SISMEMBER', 'SMEMBERS', 'SPOP', 'SRANDMEMBER', 'SREM', 'ZADD',
-                'ZCARD', 'ZCOUNT', 'ZINCRBY', 'ZRANGE', 'ZRANGEBYSCORE', 'ZRANK', 'ZREM',
-                'ZREMRANGEBYRANK', 'ZREMRANGEBYSCORE', 'ZREVRANGE', 'ZREVRANGEBYSCORE', 
-                'ZREVRANK', 'ZSCORE', 'APPEND', 'BITCOUNT', 'BITOP', 'DECR', 'DECRBY', 
-                'GET', 'GETBIT', 'GETRANGE', 'GETSET', 'INCR', 'INCRBY', 'INCRBYFLOAT',
-                'MGET', 'MSET', 'MSETNX', 'PSETEX', 'SET', 'SETBIT', 'SETEX', 'SETNX',
-                'SETRANGE', 'STRLEN'
-              ])
+class RedisMixin(LogMixin):
+    log_key = set([
+        'DEL', 'DUMP', 'EXISTS', 'EXPIRE', 'EXPIREAT', 'MOVE', 'PERSIST',
+        'PEXPIRE', 'PEXPIREAT', 'PTTL', 'RENAME', 'RENAMENX', 'RESTORE',
+        'SORT', 'TTL', 'TYPE', 'HGETALL', 'HKEYS', 'HLEN', 'HVALS', 'SADD',
+        'SCARD', 'SISMEMBER', 'SMEMBERS', 'SPOP', 'SRANDMEMBER', 'SREM',
+        'ZADD', 'ZCARD', 'ZCOUNT', 'ZINCRBY', 'ZRANGE', 'ZRANGEBYSCORE',
+        'ZRANK', 'ZREM', 'ZREMRANGEBYRANK', 'ZREMRANGEBYSCORE', 'ZREVRANGE',
+        'ZREVRANGEBYSCORE', 'ZREVRANK', 'ZSCORE', 'APPEND', 'BITCOUNT', 'BITOP',
+        'DECR', 'DECRBY', 'GET', 'GETBIT', 'GETRANGE', 'GETSET', 'INCR',
+        'INCRBY', 'INCRBYFLOAT', 'MGET', 'MSET', 'MSETNX', 'PSETEX', 'SET',
+        'SETBIT', 'SETEX', 'SETNX', 'SETRANGE', 'STRLEN',
+    ])
 
-    log_key_field = set(['HDEL', 'HEXISTS', 'HGET', 'HINCRBY', 'HINCRBYFLOAT', 'HSET', 'HSETNX'])
+    log_key_field = set(['HDEL',
+        'HEXISTS',
+        'HGET',
+        'HINCRBY',
+        'HINCRBYFLOAT',
+        'HSET',
+        'HSETNX'
+    ])
 
     log_script = set(['EVALSHA'])
 
-    def log(self, format_str, *format_args, **log_options):
-        """
-        wrapper around the module's logger
-
-        format_str -- string -- the message to log
-        *format_args -- list -- if format_str is a string containing {}, then format_str.format(*format_args) is ran
-        **log_options --
-            level -- something like logging.DEBUG
-        """
-        log_level = log_options.get('level', logging.DEBUG)
-        if logger.isEnabledFor(log_level):
-            if format_args:
-                logger.log(log_level, format_str.format(*format_args))
-            else:
-                logger.log(log_level, format_str)
-
     def log_call(self, args, res, is_pipe=False, **log_options):
         log_level = log_options.get('level', logging.DEBUG)
-        if not logger.isEnabledFor(log_level): return
+        if not self.is_logging(log_level): return
+        #if not logger.isEnabledFor(log_level): return
 
         format_log = '{} QUEUED' if is_pipe else '{}'
         format_args = []
@@ -149,12 +148,20 @@ class RedisMixin(object):
 class RedisPipeline(RedisMixin, Pipeline):
     def _execute_pipeline(self, connection, commands, raise_on_error):
         self.log('Execute {} Pipeline commands', len(commands))
-        res = super(RedisPipeline, self)._execute_pipeline(connection, commands, raise_on_error)
+        res = super(RedisPipeline, self)._execute_pipeline(
+            connection,
+            commands,
+            raise_on_error
+        )
         return res
 
     def _execute_transaction(self, connection, commands, raise_on_error):
         self.log('Execute {} Transaction commands', len(commands))
-        res = super(RedisPipeline, self)._execute_transaction(connection, commands, raise_on_error)
+        res = super(RedisPipeline, self)._execute_transaction(
+            connection,
+            commands,
+            raise_on_error
+        )
         return res
 
     def execute_command(self, *args, **kwargs):

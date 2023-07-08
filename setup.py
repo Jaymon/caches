@@ -38,7 +38,7 @@ setup(
     author_email='jay@marcyes.com',
     url='http://github.com/jaymon/{}'.format(name),
     license="MIT",
-    install_requires=['redis', 'dsnparse', 'decorators', 'datatypes'],
+    install_requires=['redis', 'dsnparse', 'datatypes'],
     #tests_require=['testdata'],
     classifiers=[ # https://pypi.python.org/pypi?:action=list_classifiers
         'Development Status :: 5 - Production/Stable',

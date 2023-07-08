@@ -13,7 +13,7 @@ Caches relies on setting the environment variable `CACHES_DSN`:
 
     caches.interface.Redis://localhost/0
 
-If you want to cache things using more than one redis server, you can actually set multiple environment variables:
+If you want to cache things using more than one Redis server, you can actually set multiple environment variables:
 
     export CACHES_DSN_1=caches.interface.Redis://somedomain.com/0#redis1
     export CACHES_DSN_2=caches.interface.Redis://someotherdomain.com/0#redis2
@@ -24,12 +24,12 @@ After you've set the environment variable, then you just need to import caches i
 import caches
 ```
 
-Caches will take care of parsing the url and creating the redis connection, automatically, so after the import Caches will be ready to use.
+Caches will take care of parsing the url and creating the Redis connection, automatically, so after importing Caches will be ready to use.
 
 
 ### Interface
 
-All caches caching classes have a similar interface, their constructor takes a key and data:
+All Caches caching classes have a similar interface, their constructor takes a key and data:
 
 ```python
 c = Cache(['foo', 'bar', 'che'])
@@ -44,7 +44,7 @@ print c.key # foo
 print c # "boom!"
 ```
 
-Each caches base caching class is meant to be extended so you can set some parameters:
+Each Caches base caching class is meant to be extended so you can set some parameters:
 
 * **serialize** -- boolean -- True if you want all values pickled, False if you don't (ie, you're caching ints or strings or something).
 
@@ -74,7 +74,7 @@ c.data = 5 # cache 5
 c += 10 # increment 5 by 10, store 15 in the cache
 
 c.clear()
-print c # None
+print(c) # None
 ```
 
 
@@ -87,7 +87,7 @@ c = DictCache('foo')
 c['bar'] = 'b'
 c['che'] = 'c'
 for key, val in c.items():
-  print key, val # will print "bar b" and then "che c"
+  print(key, val) # will print "bar b" and then "che c"
 ```
 
 
@@ -99,7 +99,7 @@ This caching object acts more or less like a Python [set](http://docs.python.org
 c = SetCache('foo')
 c.add('bar')
 c.add('che')
-print 'che' in c # True
+print('che' in c) # True
 ```
 
 
@@ -116,8 +116,8 @@ This caching object acts more or less like a Python [set](http://docs.python.org
 c = SortedSetCache('foo')
 c.add((1, 'bar'))
 c.add((10, 'che'))
-print 'che' in c # True
-print c.pop() # (1, bar)
+print('che' in c) # True
+print(c.pop()) # (1, bar)
 ```
 
 
@@ -188,15 +188,3 @@ Use pip from pypi:
 or from source using pip:
 
     pip install -U "git+https://github.com/jaymon/caches#egg=caches"
-
-
-
-## License
-
-MIT
-
-## Other links
-
-* [redis_collections module](https://github.com/redis-collections/redis-collections) - If you need broader/deeper support for python standard types like dict and set then check out this project. Prior to 2.0.0 Caches had a dependency on this module.
-* [Dogpile](http://dogpilecache.readthedocs.org/en/latest/usage.html)
-

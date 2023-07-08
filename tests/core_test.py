@@ -4,7 +4,7 @@ import sys
 import time
 import random
 
-from . import TestCase
+from datatypes import Version
 
 import caches
 from caches.compat import *
@@ -15,6 +15,8 @@ from caches.core import (
     SortedSetCache,
     SentinelCache,
 )
+
+from . import TestCase
 
 
 class CacheTest(TestCase):
@@ -266,7 +268,7 @@ class DictCacheTest(TestCase):
         d["foo"] = 2
         self.assertEqual(2, d.get("foo", 1))
 
-    def test_pop(self):
+    def test_pop_1(self):
         d = DictCache("pop")
 
         with self.assertRaises(KeyError):
@@ -280,8 +282,10 @@ class DictCacheTest(TestCase):
         self.assertFalse("foo" in d)
 
     def test_popitem(self):
-        self.skip_test("This only works on Redis >=6.2")
         d = DictCache("popitem")
+
+        if Version(d.interface.info()["redis_version"]) < "6.2":
+            self.skip_test("This only works on Redis >=6.2")
 
         with self.assertRaises(KeyError):
             d.popitem()

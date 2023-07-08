@@ -95,18 +95,22 @@ class BaseCache(object):
 
     @contextmanager
     def pipeline(self, **kwargs):
-        pipeinfo = getattr(self, "_pipeinfo", {"counter": 0, "pipe": None})
-        pipeinfo["counter"] += 1
-        if not pipeinfo["pipe"]:
-            pipeinfo["pipe"] = self.interface.pipeline()
-            self._pipeinfo = pipeinfo
+        with self.interface.pipeline() as pipe:
+            yield pipe
+            r = pipe.execute()
 
-        yield pipeinfo["pipe"]
-        pipeinfo["counter"] -= 1
-
-        if pipeinfo["counter"] <= 0:
-            pipeinfo["pipe"].execute()
-            del self._pipeinfo
+#         pipeinfo = getattr(self, "_pipeinfo", {"counter": 0, "pipe": None})
+#         pipeinfo["counter"] += 1
+#         if not pipeinfo["pipe"]:
+#             pipeinfo["pipe"] = self.interface.pipeline()
+#             self._pipeinfo = pipeinfo
+# 
+#         yield pipeinfo["pipe"]
+#         pipeinfo["counter"] -= 1
+# 
+#         if pipeinfo["counter"] <= 0:
+#             pipeinfo["pipe"].execute()
+#             del self._pipeinfo
 
 
 class Cache(BaseCache):
@@ -307,9 +311,16 @@ class DictCache(BaseCache, dict):
 
     def pop(self, k, *default):
         try:
-            # TODO -- I think this could be piped to one request
-            v = self[k]
-            del self[k]
+            with self.pipeline() as pipe:
+                pipe.hget(self.key, k)
+                pipe.hdel(self.key, k)
+                ret = pipe.execute()
+                data = ret[0]
+                if data is None:
+                    if ret[1] == 0:
+                        raise KeyError(k)
+
+                v = self.normalize_data(self.from_interface(data))
 
         except KeyError:
             if default:
@@ -319,9 +330,14 @@ class DictCache(BaseCache, dict):
         return v
 
     def popitem(self):
-        """unlike the actual dict.popitem, this pops a random item"""
+        """unlike the actual dict.popitem of python >=3.7, this pops a random
+        item
+
+        https://docs.python.org/3/library/stdtypes.html#dict.popitem
+        """
         k = self.interface.hrandfield(self.key, 1)
         if k:
+            k = k[0]
             v = self.pop(k)
             return (String(k), v)
 
@@ -339,19 +355,23 @@ class SetCache(BaseCache, set):
     https://docs.python.org/3/library/stdtypes.html#set
     https://redis.io/commands#set
     """
-    def add(self, elem):
+    def add(self, elem, **kwargs):
         data = self.to_interface(self.normalize_data(elem))
         with self.pipeline() as pipe:
-            pipe.sadd(self.key, data)
-            if self.ttl:
-                pipe.expire(self.key, self.normalize_ttl(self.ttl))
+            self._add(elem, pipe, **kwargs)
+
+    def _add(self, elem, pipe, **kwargs):
+        data = self.to_interface(self.normalize_data(elem))
+        pipe.sadd(self.key, data)
+        if self.ttl:
+            pipe.expire(self.key, self.normalize_ttl(self.ttl))
 
     def update(self, *data):
-        with self.pipeline():
+        with self.pipeline() as pipe:
             for iterator in data:
                 if iterator:
                     for elem in iterator:
-                        self.add(elem)
+                        self._add(elem, pipe)
 
     def remove(self, elem):
         """Remove element elem from the set. Raises KeyError if elem is not contained in the set."""
@@ -437,7 +457,7 @@ class SortedSetCache(SetCache):
         """normalize the score, this method is called anytime score is added/retrieved"""
         return int(score)
 
-    def add(self, item: tuple, **kwargs):
+    def _add(self, item: tuple, pipe, **kwargs):
         """add an item tuple of (score, elem) to the set
 
         https://redis.io/commands/zadd
@@ -452,9 +472,12 @@ class SortedSetCache(SetCache):
         if isinstance(item, tuple):
             if len(item) != 2:
                 raise ValueError(
-                    "SortedSetCache only accepts (score, elem) tuples, got tuple with {} values".format(
-                        len(item),
-                    )
+                    " ".join([
+                        "SortedSetCache only accepts (score, elem) tuples,",
+                        "got tuple with {} values".format(
+                            len(item),
+                        )
+                    ])
                 )
 
         else:
@@ -468,14 +491,13 @@ class SortedSetCache(SetCache):
         args = [self.key]
         score = self.normalize_score(score)
         data = self.to_interface(self.normalize_data(elem))
-        with self.pipeline() as pipe:
-            # https://github.com/andymccurdy/redis-py/issues/625
-            # https://github.com/redis/redis/pull/1132
-            # https://github.com/redis/redis/issues/1128
-            # https://redis.io/commands/zadd
-            pipe.zadd(self.key, {data: score}, **kwargs)
-            if self.ttl:
-                pipe.expire(self.key, self.normalize_ttl(self.ttl))
+        # https://github.com/andymccurdy/redis-py/issues/625
+        # https://github.com/redis/redis/pull/1132
+        # https://github.com/redis/redis/issues/1128
+        # https://redis.io/commands/zadd
+        pipe.zadd(self.key, {data: score}, **kwargs)
+        if self.ttl:
+            pipe.expire(self.key, self.normalize_ttl(self.ttl))
 
     def remove(self, elem):
         """Remove element elem from the set. Raises KeyError if elem is not contained in the set."""
@@ -494,27 +516,29 @@ class SortedSetCache(SetCache):
         """
 
         # redis >=5.0.0
-        #if desc:
-        #    res = self.interface.zpopmax(self.key, 1)
-        #
-        #else:
-        #    res = self.interface.zpopmin(self.key, 1)
-        with self.interface.pipeline() as pipe:
-            pipe.zrange(self.key, 0, 1, desc=desc, withscores=True, score_cast_func=self.normalize_score)
-            if desc:
-                pipe.zremrangebyrank(self.key, -1, -1)
+        if desc:
+            ret = self.interface.zpopmax(self.key, 1)
 
-            else:
-                pipe.zremrangebyrank(self.key, 0, 0)
+        else:
+            ret = self.interface.zpopmin(self.key, 1)
 
-            ret = pipe.execute()[0]
-            if ret:
-                ret = ret[0]
-                elem = self.normalize_data(self.from_interface(ret[0]))
-                ret = (ret[1], elem)
+#         with self.pipeline() as pipe:
+#             pipe.zrange(self.key, 0, 1, desc=desc, withscores=True, score_cast_func=self.normalize_score)
+#             if desc:
+#                 pipe.zremrangebyrank(self.key, -1, -1)
+# 
+#             else:
+#                 pipe.zremrangebyrank(self.key, 0, 0)
+# 
+#             ret = pipe.execute()[0]
 
-            else:
-                raise KeyError()
+        if ret:
+            ret = ret[0]
+            elem = self.normalize_data(self.from_interface(ret[0]))
+            ret = (ret[1], elem)
+
+        else:
+            raise KeyError()
 
         return ret
 

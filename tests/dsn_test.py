@@ -16,6 +16,10 @@ class DSNTest(TestCase):
         dsn = DSN('redis://host:1234/dbname#connection_name')
         self.assertFalse("redis" in dsn.scheme)
 
+        dsn = DSN('rediss://host:1234/dbname#connection_name')
+        self.assertFalse("rediss" in dsn.scheme)
+        self.assertTrue(dsn.connection_config()["ssl"])
+
     def test_password(self):
         dsn = DSN('redis://password@host:1234/dbname')
         self.assertTrue("password", dsn.password)
@@ -35,7 +39,7 @@ class DSNTest(TestCase):
     def test_defaults(self):
         dsn = DSN("redis://localhost?socket_timeout=1")
         self.assertEqual(6379, dsn.port)
-        self.assertEqual(1.0, dsn.query["socket_timeout"])
+        self.assertEqual(1.0, dsn.query_params["socket_timeout"])
 
 
 class ConfigureTest(TestCase):
