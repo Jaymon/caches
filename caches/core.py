@@ -514,23 +514,13 @@ class SortedSetCache(SetCache):
             return an item from the back of the set
         :returns: tuple (score, elem)
         """
-
-        # redis >=5.0.0
         if desc:
+            # https://redis.io/commands/zpopmax/
             ret = self.interface.zpopmax(self.key, 1)
 
         else:
+            # https://redis.io/commands/zpopmin/
             ret = self.interface.zpopmin(self.key, 1)
-
-#         with self.pipeline() as pipe:
-#             pipe.zrange(self.key, 0, 1, desc=desc, withscores=True, score_cast_func=self.normalize_score)
-#             if desc:
-#                 pipe.zremrangebyrank(self.key, -1, -1)
-# 
-#             else:
-#                 pipe.zremrangebyrank(self.key, 0, 0)
-# 
-#             ret = pipe.execute()[0]
 
         if ret:
             ret = ret[0]
