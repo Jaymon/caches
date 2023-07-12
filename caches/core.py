@@ -45,7 +45,7 @@ class BaseCache(object):
         dec = cached(cls, *args, **kwargs)
         return dec
 
-    def __init__(self, key, data=None, **kwargs):
+    def __init__(self, key="", data=None, **kwargs):
         # allow for overriding class value with passed in values
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -57,7 +57,14 @@ class BaseCache(object):
         if isinstance(key, (basestring, int)):
             key = [key]
         prefixes = [self.normalize_prefix(self.prefix)]
-        return '.'.join(map(String, itertools.chain(prefixes, key)))
+        nkey = '.'.join(
+            map(String, filter(None, itertools.chain(prefixes, key)))
+        )
+
+        if not nkey:
+            raise ValueError("No key")
+
+        return nkey
 
     def normalize_data(self, data):
         return data
@@ -98,19 +105,6 @@ class BaseCache(object):
         with self.interface.pipeline() as pipe:
             yield pipe
             r = pipe.execute()
-
-#         pipeinfo = getattr(self, "_pipeinfo", {"counter": 0, "pipe": None})
-#         pipeinfo["counter"] += 1
-#         if not pipeinfo["pipe"]:
-#             pipeinfo["pipe"] = self.interface.pipeline()
-#             self._pipeinfo = pipeinfo
-# 
-#         yield pipeinfo["pipe"]
-#         pipeinfo["counter"] -= 1
-# 
-#         if pipeinfo["counter"] <= 0:
-#             pipeinfo["pipe"].execute()
-#             del self._pipeinfo
 
 
 class Cache(BaseCache):
@@ -176,6 +170,15 @@ class Cache(BaseCache):
         res = int(res)
         self._data = res
         return res
+
+    def get(self, *default):
+        data = self.data
+        if data is None and default:
+            data = default[0]
+        return data
+
+    def set(self, data):
+        self.data = data
 
     def __iadd__(self, other):
         self.increment(other)

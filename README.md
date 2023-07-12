@@ -7,16 +7,17 @@ Caches has been used in production for years across many different products, han
 
 ## How to use
 
-Caches can only use [Redis](http://redis.io).
-
 Caches relies on setting the environment variable `CACHES_DSN`:
 
-    caches.interface.Redis://localhost/0
+    redis://localhost/0
 
-If you want to cache things using more than one Redis server, you can actually set multiple environment variables:
+If you want to cache things using more than one Redis server, you can actually set multiple environment variables and specify the `caches.interface.Redis` class you want to use:
 
-    export CACHES_DSN_1=caches.interface.Redis://somedomain.com/0#redis1
-    export CACHES_DSN_2=caches.interface.Redis://someotherdomain.com/0#redis2
+    # redis1 uses the standard Redis interface
+    export CACHES_DSN_1=redis://somedomain.com/0#redis1
+    
+    # redis2 uses a custom interface child class
+    export CACHES_DSN_2=custom.interface.Redis://someotherdomain.com/0#redis2
 
 After you've set the environment variable, then you just need to import caches in your code:
 
@@ -24,7 +25,7 @@ After you've set the environment variable, then you just need to import caches i
 import caches
 ```
 
-Caches will take care of parsing the url and creating the Redis connection, automatically, so after importing Caches will be ready to use.
+Caches will take care of parsing the and DSN urls and creating the associated Redis connections automatically, so after importing, Caches will be ready to use.
 
 
 ### Interface
@@ -52,7 +53,7 @@ Each Caches base caching class is meant to be extended so you can set some param
 
 * **ttl** -- integer -- time to live, how many seconds to cache the value. 0 (default) means cache forever.
 
-* **connection_name** -- string -- if you have more than one caches dsn then you can use this to set the name of the connection you want (the name of the connection is the `#connection_name` fragment of a dsn url).
+* **connection_name** -- string -- if you have more than one caches DSN then you can use this to set the name of the connection you want (the name of the connection is the `#connection_name` fragment of a DSN url).
 
 ```python
 class MyIntCache(Cache):
